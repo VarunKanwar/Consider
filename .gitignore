@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+.feedback/
+*.vsix
+*.tgz
+.DS_Store
