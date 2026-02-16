@@ -11,6 +11,7 @@
     "Other"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "workspaceContains:.feedback/store.json",
     "onCommand:feedback-loop.addComment",
     "onCommand:feedback-loop.setupAgentIntegration"

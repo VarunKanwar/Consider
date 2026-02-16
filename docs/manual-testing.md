@@ -11,7 +11,7 @@
 1. Open the `feedback-loop` repo in VS Code.
 2. Press **F5** (or Run > Start Debugging). Select "Run Extension" if prompted.
 3. A new VS Code window (Extension Development Host) should open.
-4. **Expected:** No errors in the Debug Console. The extension is active.
+4. **Expected:** No errors in the Debug Console. The extension is active immediately on startup (no command needed first).
 
 ## Test 2: Setup Agent Integration (Stub)
 
@@ -23,14 +23,19 @@
 ## Test 3: Add a Comment
 
 1. Open any source file in the Extension Development Host.
-2. Hover over the gutter (left margin) on any line — you should see a `+` icon appear.
+2. Preferred path: hover over the glyph margin (left of line numbers) on any line — you should see a `+` icon appear.
 3. Click the `+` icon to create a new comment thread.
 4. Type a comment (e.g., "This function should handle errors") and click the submit button (checkmark or press Cmd+Enter).
-5. **Expected:**
+5. Alternate path: run **Feedback: Add Comment** from Command Palette and enter the comment in the prompt.
+6. **Expected:**
    - The comment appears inline next to the line.
    - Author shows as "Developer".
    - `.feedback/store.json` now contains the comment with correct file path, line numbers, and body text.
    - The comment has status `"open"`.
+
+If the `+` icon never appears:
+- Ensure `"editor.glyphMargin": true` in settings.
+- Ensure the file is on disk (not an untitled buffer) and the extension host window has an open workspace folder.
 
 ## Test 4: Reply to a Comment
 

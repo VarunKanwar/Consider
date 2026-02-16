@@ -117,8 +117,12 @@ class FeedbackLoopController {
     this.disposables.push(
       vscode.commands.registerCommand(
         'feedback-loop.addComment',
-        (reply: vscode.CommentReply) => {
-          this.handleNewComment(reply);
+        (arg?: unknown) => {
+          if (this.isCommentReply(arg)) {
+            this.handleNewComment(arg);
+            return;
+          }
+          void this.handleAddCommentFromCommandPalette();
         }
       )
     );
@@ -202,10 +206,66 @@ class FeedbackLoopController {
   // --- Comment handlers ---
 
   private handleNewComment(reply: vscode.CommentReply): void {
+    if (!reply || !reply.thread) {
+      vscode.window.showErrorMessage('Could not determine comment thread context.');
+      return;
+    }
     const thread = reply.thread;
     const document = vscode.workspace.textDocuments.find(
       (doc) => doc.uri.toString() === thread.uri.toString()
     );
+    this.createRootComment(thread, reply.text, document);
+  }
+
+  private async handleAddCommentFromCommandPalette(): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      vscode.window.showWarningMessage('Open a file before adding feedback.');
+      return;
+    }
+    if (editor.document.uri.scheme !== 'file') {
+      vscode.window.showWarningMessage(
+        'Feedback comments can only be added to files on disk.'
+      );
+      return;
+    }
+
+    const selection = editor.selection;
+    const startLine = Math.min(selection.start.line, selection.end.line);
+    let endLine = Math.max(selection.start.line, selection.end.line);
+    if (!selection.isEmpty && selection.end.character === 0 && endLine > startLine) {
+      endLine -= 1;
+    }
+
+    const body = await vscode.window.showInputBox({
+      prompt: 'Write feedback for the agent...',
+      placeHolder: 'Type your feedback here',
+      ignoreFocusOut: true,
+      validateInput: (value) => {
+        return value.trim().length === 0 ? 'Feedback cannot be empty.' : null;
+      },
+    });
+    if (!body || body.trim().length === 0) {
+      return;
+    }
+
+    const thread = this.commentController.createCommentThread(
+      editor.document.uri,
+      new vscode.Range(startLine, 0, endLine, 0),
+      []
+    );
+    this.createRootComment(thread, body, editor.document);
+  }
+
+  private createRootComment(
+    thread: vscode.CommentThread,
+    body: string,
+    document?: vscode.TextDocument
+  ): void {
+    const normalizedBody = body.trim();
+    if (normalizedBody.length === 0) {
+      return;
+    }
 
     const relativePath = path.relative(this.projectRoot, thread.uri.fsPath);
     const range = thread.range;
@@ -254,7 +314,7 @@ class FeedbackLoopController {
       status: 'open',
       createdAt: now,
       author: 'human',
-      body: reply.text,
+      body: normalizedBody,
       thread: [],
     };
     store.comments.push(feedbackComment);
@@ -262,14 +322,14 @@ class FeedbackLoopController {
 
     // Create the visual comment
     const newComment = new FeedbackReply(
-      reply.text,
+      normalizedBody,
       HUMAN_AUTHOR,
       commentId,
       vscode.CommentMode.Preview
     );
     thread.comments = [newComment];
     this.applyThreadPresentation(thread, 'open');
-    thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+    thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
 
     // Track the thread
     this.threadMap.set(commentId, thread);
@@ -702,12 +762,20 @@ class FeedbackLoopController {
 
     thread.comments = comments;
     this.applyThreadPresentation(thread, comment.status);
-    thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+    thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
 
     this.threadMap.set(comment.id, thread);
   }
 
   // --- Helpers ---
+
+  private isCommentReply(value: unknown): value is vscode.CommentReply {
+    if (!value || typeof value !== 'object') {
+      return false;
+    }
+    const candidate = value as Partial<vscode.CommentReply>;
+    return typeof candidate.text === 'string' && candidate.thread !== undefined;
+  }
 
   /**
    * Get the store comment ID from a thread by looking at the first comment.
