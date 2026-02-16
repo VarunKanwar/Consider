@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(chmod:*)",
+      "Bash(node cli/feedback-cli.js:*)",
+      "Bash(npm test:*)",
+      "Bash(ln:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run compile:*)",
+      "Bash(node -e:*)"
+    ]
+  }
+}

@@ -1,0 +1,143 @@
+# AGENTS.md — Feedback Loop
+
+You are working on **Feedback Loop**, a VS Code extension and CLI tool for inline, bidirectional code feedback between developers and AI agents. Read `docs/spec.md` before doing anything. It is the canonical reference for all architectural decisions, data models, and constraints.
+
+## Project overview
+
+Three components: a VS Code extension (TypeScript), a feedback store (`.feedback/store.json`), and a CLI tool (standalone Node.js, zero npm dependencies). The extension and CLI both read/write the same JSON store. Communication between developer and agent is mediated entirely through the filesystem — no IPC, no server.
+
+The spec has 5 hard constraints (Section 2). Memorize them. The most commonly violated one will be C5: the CLI must have zero npm dependencies and work with only Node builtins (`fs`, `path`, `crypto`, `process`).
+
+## Build phases
+
+This project is built in phases. **Complete one phase fully before starting the next.** Do not skip ahead, do not partially implement a later phase, and do not combine phases unless explicitly told to. Each phase should produce a working, testable increment.
+
+- **Phase 1: Store format + CLI skeleton** — JSON schema, CLI with `list`, `get`, `reply`, `resolve`, `summary`, `context`. Static line numbers, no reconciliation yet. Testable by hand-editing `store.json`.
+- **Phase 2: Extension skeleton** — VS Code Comments API wired up. Add/view/reply/resolve comments. Persist to store. File watcher for agent replies.
+- **Phase 3: Content-based anchoring** — Re-anchoring algorithm in both CLI and extension. Mtime-based change detection. Staleness and orphan detection. This is the riskiest piece — test thoroughly.
+- **Phase 4: Agent integration setup** — "Setup Agent Integration" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
+- **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
+
+When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
+
+## What not to build
+
+The spec distinguishes v1 from v2 explicitly. Do not build:
+- MCP server (Section 8.3 — deliberately deferred)
+- Label/tagging system (Section 9.2 — v2 enhancement)
+- Queue/dispatch model — comments are `open` on creation, no `queued` status
+- Complex build pipelines — the CLI is a single `.js` file with no build step
+- Per-agent deep integration or message injection into agent conversations
+
+If you think something should be added that isn't in the spec, ask before building it.
+
+## Repository structure
+
+After scaffolding, the repo should look roughly like:
+
+```
+feedback-loop/
+├── docs/
+│   ├── spec.md                 # Technical specification (read-only reference)
+│   ├── progress.md             # Phase completion log (you update this)
+│   └── manual-testing.md       # Manual test procedures (you generate this)
+├── extension/                  # VS Code extension (TypeScript)
+│   ├── src/
+│   ├── package.json            # Extension manifest
+│   └── tsconfig.json
+├── cli/                        # CLI tool source (Node.js, zero dependencies)
+│   ├── feedback-cli.js         # Main implementation
+│   └── feedback-cli            # Shell wrapper
+├── shared/                     # Shared logic (if extracted — see spec Section 9.5)
+├── test/                       # Test fixtures and test scripts
+│   ├── cli/
+│   └── extension/
+├── AGENTS.md                   # This file
+├── CLAUDE.md                   # → symlink to AGENTS.md
+├── .gitignore
+└── README.md
+```
+
+This is a starting point. Adjust as needed during implementation, but explain structural changes in your commit messages and in `docs/progress.md`.
+
+## Technology decisions
+
+**Extension:** TypeScript. Use VS Code's Comments API (not custom webview UI). Standard extension scaffolding via `yo code` or equivalent. The extension manifest (`package.json`) should declare the minimum VS Code engine version that supports the Comments API features we need.
+
+**CLI:** Node.js. Zero npm dependencies — only builtins. Must be invocable as `.feedback/bin/feedback-cli <command>` via the shell wrapper. See spec Section 6.1 for the wrapper script. The CLI is both the development source (in `cli/`) and a deployable artifact that gets copied into `.feedback/bin/` by the extension's setup command.
+
+**Store:** Single JSON file at `.feedback/store.json`. Schema defined in spec Section 4.2. Use atomic writes (write to temp file, then rename) to prevent corrupt reads during concurrent access.
+
+**Re-anchoring:** Both the CLI and extension implement this. The algorithm must produce identical results in both. Spec Section 4.3 has the full algorithm. Consider extracting into a shared `.js` file, but don't over-engineer the sharing mechanism.
+
+## Commands reference
+
+### Build and test
+
+```sh
+# Extension
+cd extension && npm install && npm run compile
+# Run extension in development: F5 in VS Code (launch.json should be set up)
+
+# CLI (no build step)
+node cli/feedback-cli.js --help
+
+# Tests
+npm test                        # Run all tests
+npm run test:cli                # CLI tests only
+npm run test:extension          # Extension tests only
+```
+
+Set up these npm scripts during Phase 1/2 scaffolding. Adjust as needed but keep the top-level `npm test` working at all times.
+
+### Linting and formatting
+
+Use ESLint and Prettier with standard TypeScript configs. Run `npm run lint` and `npm run format`. Configure these during scaffolding. Do not deviate from standard community configs unless there's a specific reason.
+
+## Testing expectations
+
+Every phase must include tests. What "tests" means varies by phase:
+
+**Phase 1 (CLI):** Automated tests. Create test fixtures (sample `store.json` files), run CLI commands, verify output. Test each command with normal input, edge cases (empty store, nonexistent ID, missing file), and the `--json` flag. A simple test runner using Node's built-in `node:test` and `node:assert` is fine — no test framework dependencies in the CLI.
+
+**Phase 2 (Extension):** Manual testing instructions in `docs/manual-testing.md`. Step-by-step: open VS Code with the extension in dev mode, open a test project, add a comment, verify it appears in `store.json`, simulate an agent reply by editing the store externally, verify the reply renders. Also write unit tests for any pure logic (store read/write, ID generation).
+
+**Phase 3 (Anchoring):** Automated tests with specific edit scenarios. Spec Section 4.3 lists the patterns to test: insertion above a comment, deletion of lines around a comment, function rename, file deletion. Create fixture files, apply known edits, verify re-anchored positions and staleness detection. These tests must cover both the CLI and extension implementations and verify they produce the same results.
+
+**Phase 4 (Agent setup):** Verify the setup command creates correct directory structure, generates valid skill files, appends to `.gitignore` without duplicates. Test with and without existing `.claude/`, `.opencode/`, `AGENTS.md` directories.
+
+**Phase 5 (Polish):** Manual testing for UI features (tree view, archive). Automated tests for any new logic.
+
+## Commit conventions
+
+- Small, focused commits. One logical change per commit.
+- Format: `phase N: short description` (e.g., `phase 1: implement CLI list command with status filtering`)
+- If a commit touches multiple phases (should be rare), explain why in the commit body.
+- Never commit broken tests. If a test is failing, fix it in the same commit or explain in the message why it's expected.
+- Commit `docs/progress.md` updates at the end of each phase.
+
+## Code style
+
+- TypeScript strict mode for the extension.
+- No `any` types unless genuinely unavoidable (and add a comment explaining why).
+- Prefer explicit error handling over try/catch-all. The CLI especially should give clear error messages (e.g., "Comment c_abc123 not found" not "Cannot read property 'id' of undefined").
+- No unnecessary abstractions. This is a two-component system with a simple data model. Don't introduce patterns (dependency injection, event buses, plugin systems) that the current scope doesn't require.
+- Comments in code should explain *why*, not *what*. The spec already documents the what.
+
+## Important implementation notes
+
+**Atomic writes:** Both the CLI and extension must write `store.json` atomically (write to `.feedback/store.json.tmp`, then `fs.renameSync`). This prevents corrupt reads if one process reads while the other is mid-write.
+
+**Comment IDs:** Generate with `c_` prefix + random hex from `crypto.randomBytes`. Reply IDs use `r_` prefix. Keep them short enough to type in a CLI command but unique enough to avoid collisions.
+
+**File paths in the store:** Always relative to the project root. Never absolute paths. The CLI resolves them relative to the `.feedback/` directory's parent.
+
+**The extension copies the CLI into `.feedback/bin/`:** During the setup command, the extension copies the CLI source into the target project's `.feedback/bin/` directory. This means the CLI in `cli/` is the development source, and the copy in `.feedback/bin/` is the deployed artifact. They must be the same file. Don't introduce a build step between them.
+
+**Status model is simple:** `open` → `resolved` (either party). `open` → `stale` (reconciliation detected content change). `open` → `orphaned` (file deleted). `resolved` can be reopened to `open`. `stale` can be manually re-anchored back to `open`. That's it.
+
+## When you're unsure
+
+- **Architectural questions:** Check `docs/spec.md` first. If the answer isn't there, ask before implementing.
+- **Implementation details** the spec doesn't cover (e.g., debounce timing for extension re-anchoring, exact similarity threshold for staleness): make a reasonable choice, document it in a code comment and in `docs/progress.md`, and move on. These can be tuned later.
+- **Scope creep:** If you find yourself building something that would take more than ~30 minutes and isn't described in the current phase, stop and ask.

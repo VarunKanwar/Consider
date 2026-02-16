@@ -1,0 +1,103 @@
+{
+  "name": "feedback-loop",
+  "displayName": "Feedback Loop",
+  "description": "Inline bidirectional feedback between developers and AI agents",
+  "version": "0.1.0",
+  "publisher": "feedback-loop",
+  "engines": {
+    "vscode": "^1.82.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.feedback/store.json",
+    "onCommand:feedback-loop.addComment",
+    "onCommand:feedback-loop.setupAgentIntegration"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "feedback-loop.addComment",
+        "title": "Feedback: Add Comment"
+      },
+      {
+        "command": "feedback-loop.replyToComment",
+        "title": "Reply"
+      },
+      {
+        "command": "feedback-loop.resolveThread",
+        "title": "Resolve"
+      },
+      {
+        "command": "feedback-loop.unresolveThread",
+        "title": "Reopen"
+      },
+      {
+        "command": "feedback-loop.deleteComment",
+        "title": "Delete"
+      },
+      {
+        "command": "feedback-loop.setupAgentIntegration",
+        "title": "Feedback: Setup Agent Integration"
+      },
+      {
+        "command": "feedback-loop.showAllComments",
+        "title": "Feedback: Show All Comments"
+      },
+      {
+        "command": "feedback-loop.archiveResolved",
+        "title": "Feedback: Archive Resolved"
+      },
+      {
+        "command": "feedback-loop.reconcileAll",
+        "title": "Feedback: Reconcile All"
+      }
+    ],
+    "menus": {
+      "comments/commentThread/title": [
+        {
+          "command": "feedback-loop.resolveThread",
+          "group": "navigation",
+          "when": "commentController == feedback-loop && commentThreadContext =~ /feedback-thread-open|feedback-thread-stale/"
+        },
+        {
+          "command": "feedback-loop.unresolveThread",
+          "group": "navigation",
+          "when": "commentController == feedback-loop && commentThreadContext == feedback-thread-resolved"
+        }
+      ],
+      "comments/commentThread/context": [
+        {
+          "command": "feedback-loop.addComment",
+          "group": "inline",
+          "when": "commentController == feedback-loop && commentThreadIsEmpty"
+        },
+        {
+          "command": "feedback-loop.replyToComment",
+          "group": "inline",
+          "when": "commentController == feedback-loop && !commentThreadIsEmpty"
+        }
+      ],
+      "comments/comment/title": [
+        {
+          "command": "feedback-loop.deleteComment",
+          "group": "inline",
+          "when": "commentController == feedback-loop"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.82.0",
+    "typescript": "^5.3.0"
+  }
+}
