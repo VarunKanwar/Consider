@@ -12,6 +12,7 @@ import {
   FeedbackStore,
   Reply,
 } from './store';
+import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
 
 // --- Comment author labels ---
 const HUMAN_AUTHOR: vscode.CommentAuthorInformation = {
@@ -66,6 +67,7 @@ class FeedbackLoopController {
 
   /** Debounce flag to avoid re-reading store during our own writes */
   private suppressWatcher = false;
+  private reconcileTimers: Map<string, NodeJS.Timeout> = new Map();
 
   constructor(private context: vscode.ExtensionContext) {
     this.projectRoot = this.getProjectRoot();
@@ -93,6 +95,7 @@ class FeedbackLoopController {
     this.registerCommands();
     this.setupStoreWatcher();
     this.loadAllThreads();
+    this.setupDocumentReconciliation();
   }
 
   private getProjectRoot(): string {
@@ -188,12 +191,10 @@ class FeedbackLoopController {
       })
     );
 
-    // Reconcile All (Phase 3 stub)
+    // Reconcile All
     this.disposables.push(
       vscode.commands.registerCommand('feedback-loop.reconcileAll', () => {
-        vscode.window.showInformationMessage(
-          'Feedback: Reconcile All — coming in Phase 3.'
-        );
+        this.handleReconcileAll();
       })
     );
   }
@@ -247,6 +248,7 @@ class FeedbackLoopController {
         contextBefore,
         contextAfter,
         targetContent,
+        contentHash: hashAnchorContent(targetContent),
         lastAnchorCheck: now,
       },
       status: 'open',
@@ -266,8 +268,7 @@ class FeedbackLoopController {
       vscode.CommentMode.Preview
     );
     thread.comments = [newComment];
-    thread.label = 'Feedback';
-    thread.contextValue = 'feedback-thread-open';
+    this.applyThreadPresentation(thread, 'open');
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
 
     // Track the thread
@@ -322,8 +323,7 @@ class FeedbackLoopController {
     comment.status = 'resolved';
     this.writeStoreSuppress(store);
 
-    thread.contextValue = 'feedback-thread-resolved';
-    thread.state = vscode.CommentThreadState.Resolved;
+    this.applyThreadPresentation(thread, 'resolved');
   }
 
   private handleUnresolve(thread: vscode.CommentThread): void {
@@ -337,8 +337,7 @@ class FeedbackLoopController {
     comment.status = 'open';
     this.writeStoreSuppress(store);
 
-    thread.contextValue = 'feedback-thread-open';
-    thread.state = vscode.CommentThreadState.Unresolved;
+    this.applyThreadPresentation(thread, 'open');
   }
 
   private handleDeleteComment(comment: FeedbackReply): void {
@@ -386,6 +385,166 @@ class FeedbackLoopController {
     vscode.window.showInformationMessage(
       'Feedback Loop: .feedback/ directory initialized. Full agent setup coming in Phase 4.'
     );
+  }
+
+  private handleReconcileAll(): void {
+    const store = readStore(this.projectRoot);
+    const result = reconcileStoreForExtension(this.projectRoot, store, { force: true });
+    if (result.changed) {
+      this.writeStoreSuppress(store);
+      this.reloadFromStore();
+    }
+    const summary = result.changed
+      ? `updated ${result.updatedComments} comment${result.updatedComments === 1 ? '' : 's'}`
+      : 'no anchor updates needed';
+    vscode.window.showInformationMessage(
+      `Feedback: Reconcile All checked ${result.checkedComments} comment${result.checkedComments === 1 ? '' : 's'}; ${summary}.`
+    );
+  }
+
+  // --- File/document reconciliation ---
+
+  private setupDocumentReconciliation(): void {
+    this.disposables.push(
+      vscode.workspace.onDidOpenTextDocument((document) => {
+        this.reconcileDocumentFile(document, false);
+      })
+    );
+
+    this.disposables.push(
+      vscode.workspace.onDidSaveTextDocument((document) => {
+        this.reconcileDocumentFile(document, false);
+      })
+    );
+
+    this.disposables.push(
+      vscode.workspace.onDidChangeTextDocument((event) => {
+        this.scheduleReconcileForDocument(event.document);
+      })
+    );
+
+    for (const document of vscode.workspace.textDocuments) {
+      this.reconcileDocumentFile(document, false);
+    }
+  }
+
+  private scheduleReconcileForDocument(document: vscode.TextDocument): void {
+    const relativePath = this.getRelativePathIfInProject(document.uri);
+    if (!relativePath) return;
+
+    const timerKey = relativePath;
+    const existing = this.reconcileTimers.get(timerKey);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    const timer = setTimeout(() => {
+      this.reconcileTimers.delete(timerKey);
+      this.reconcileFile(relativePath, false);
+      this.syncThreadAnchorsFromDocument(document, relativePath);
+    }, 250);
+
+    this.reconcileTimers.set(timerKey, timer);
+  }
+
+  private reconcileDocumentFile(document: vscode.TextDocument, force: boolean): void {
+    const relativePath = this.getRelativePathIfInProject(document.uri);
+    if (!relativePath) return;
+    this.reconcileFile(relativePath, force);
+  }
+
+  private reconcileFile(relativePath: string, force: boolean): void {
+    let store: FeedbackStore;
+    try {
+      store = readStore(this.projectRoot);
+    } catch {
+      return;
+    }
+    const result = reconcileStoreForExtension(this.projectRoot, store, {
+      force,
+      files: [relativePath],
+    });
+    if (!result.changed) return;
+
+    this.writeStoreSuppress(store);
+    this.reloadFromStore();
+  }
+
+  private syncThreadAnchorsFromDocument(
+    document: vscode.TextDocument,
+    relativePath: string
+  ): void {
+    if (document.uri.scheme !== 'file') return;
+
+    let store: FeedbackStore;
+    try {
+      store = readStore(this.projectRoot);
+    } catch {
+      return;
+    }
+    const lines = document.getText().split('\n');
+    const now = new Date().toISOString();
+    let changed = false;
+
+    for (const comment of store.comments) {
+      if (comment.status !== 'open' || comment.file !== relativePath) {
+        continue;
+      }
+      const thread = this.threadMap.get(comment.id);
+      if (!thread || !thread.range) continue;
+
+      const startLine = thread.range.start.line + 1;
+      const endLine = thread.range.end.line + 1;
+
+      const targetContent = lines.slice(startLine - 1, endLine).join('\n');
+      const contextBefore = lines.slice(Math.max(0, startLine - 3), Math.max(0, startLine - 1));
+      const contextAfter = lines.slice(endLine, Math.min(lines.length, endLine + 2));
+      const contentHash = hashAnchorContent(targetContent);
+
+      if (comment.anchor.startLine !== startLine) {
+        comment.anchor.startLine = startLine;
+        changed = true;
+      }
+      if (comment.anchor.endLine !== endLine) {
+        comment.anchor.endLine = endLine;
+        changed = true;
+      }
+      if (JSON.stringify(comment.anchor.contextBefore || []) !== JSON.stringify(contextBefore)) {
+        comment.anchor.contextBefore = contextBefore;
+        changed = true;
+      }
+      if (JSON.stringify(comment.anchor.contextAfter || []) !== JSON.stringify(contextAfter)) {
+        comment.anchor.contextAfter = contextAfter;
+        changed = true;
+      }
+      if ((comment.anchor.targetContent || '') !== targetContent) {
+        comment.anchor.targetContent = targetContent;
+        changed = true;
+      }
+      if ((comment.anchor.contentHash || '') !== contentHash) {
+        comment.anchor.contentHash = contentHash;
+        changed = true;
+      }
+      if (comment.anchor.lastAnchorCheck !== now) {
+        comment.anchor.lastAnchorCheck = now;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.writeStoreSuppress(store);
+    }
+  }
+
+  private getRelativePathIfInProject(uri: vscode.Uri): string | null {
+    if (uri.scheme !== 'file') {
+      return null;
+    }
+    const relativePath = path.relative(this.projectRoot, uri.fsPath);
+    if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+      return null;
+    }
+    return relativePath.replace(/\\/g, '/');
   }
 
   // --- Store file watcher ---
@@ -476,14 +635,7 @@ class FeedbackLoopController {
 
     thread.comments = comments;
 
-    // Update status
-    if (comment.status === 'resolved') {
-      thread.state = vscode.CommentThreadState.Resolved;
-      thread.contextValue = 'feedback-thread-resolved';
-    } else {
-      thread.state = vscode.CommentThreadState.Unresolved;
-      thread.contextValue = `feedback-thread-${comment.status}`;
-    }
+    this.applyThreadPresentation(thread, comment.status);
 
     // Update range if anchor changed (will matter in Phase 3)
     const newRange = new vscode.Range(
@@ -549,17 +701,8 @@ class FeedbackLoopController {
     }
 
     thread.comments = comments;
-    thread.label = comment.status === 'stale' ? 'Stale Feedback' :
-                   comment.status === 'orphaned' ? 'Orphaned Feedback' :
-                   'Feedback';
-    thread.contextValue = comment.status === 'resolved'
-      ? 'feedback-thread-resolved'
-      : `feedback-thread-${comment.status}`;
+    this.applyThreadPresentation(thread, comment.status);
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
-
-    if (comment.status === 'resolved') {
-      thread.state = vscode.CommentThreadState.Resolved;
-    }
 
     this.threadMap.set(comment.id, thread);
   }
@@ -577,6 +720,26 @@ class FeedbackLoopController {
     return undefined;
   }
 
+  private applyThreadPresentation(
+    thread: vscode.CommentThread,
+    status: FeedbackComment['status']
+  ): void {
+    thread.label = status === 'stale'
+      ? 'Stale Feedback'
+      : status === 'orphaned'
+        ? 'Orphaned Feedback'
+        : 'Feedback';
+
+    if (status === 'resolved') {
+      thread.state = vscode.CommentThreadState.Resolved;
+      thread.contextValue = 'feedback-thread-resolved';
+      return;
+    }
+
+    thread.state = vscode.CommentThreadState.Unresolved;
+    thread.contextValue = `feedback-thread-${status}`;
+  }
+
   /**
    * Write to store with watcher suppression to avoid re-reading our own writes.
    */
@@ -590,6 +753,11 @@ class FeedbackLoopController {
   }
 
   dispose(): void {
+    for (const timer of this.reconcileTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.reconcileTimers.clear();
+
     for (const d of this.disposables) {
       d.dispose();
     }

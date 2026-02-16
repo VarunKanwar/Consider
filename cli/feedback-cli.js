@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const store = require('../shared/store.js');
+const reconcile = require('../shared/reconcile.js');
 
 // --- Argument parsing ---
 
@@ -68,10 +69,19 @@ function truncate(str, maxLen = 80) {
   return str.slice(0, maxLen - 3) + '...';
 }
 
+function loadStoreForRead(projectRoot) {
+  const data = store.readStore(projectRoot);
+  const result = reconcile.reconcileStore(projectRoot, data);
+  if (result.changed) {
+    store.writeStore(projectRoot, data);
+  }
+  return data;
+}
+
 // --- Commands ---
 
 function cmdList(projectRoot, flags) {
-  const data = store.readStore(projectRoot);
+  const data = loadStoreForRead(projectRoot);
   const statusFilter = flags.status || 'open';
   const fileFilter = flags.file || null;
 
@@ -116,7 +126,7 @@ function cmdList(projectRoot, flags) {
 function cmdGet(projectRoot, commentId, flags) {
   if (!commentId) die('Usage: feedback-cli get <comment-id>');
 
-  const data = store.readStore(projectRoot);
+  const data = loadStoreForRead(projectRoot);
   const comment = store.findComment(data, commentId);
   if (!comment) die(`Comment ${commentId} not found.`);
 
@@ -184,7 +194,7 @@ function cmdResolve(projectRoot, commentId) {
 }
 
 function cmdSummary(projectRoot, flags) {
-  const data = store.readStore(projectRoot);
+  const data = loadStoreForRead(projectRoot);
   const comments = data.comments;
 
   const byStatus = {};
@@ -231,7 +241,7 @@ function cmdSummary(projectRoot, flags) {
 function cmdContext(projectRoot, commentId, flags) {
   if (!commentId) die('Usage: feedback-cli context <comment-id>');
 
-  const data = store.readStore(projectRoot);
+  const data = loadStoreForRead(projectRoot);
   const comment = store.findComment(data, commentId);
   if (!comment) die(`Comment ${commentId} not found.`);
 

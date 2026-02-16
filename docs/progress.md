@@ -99,3 +99,75 @@
 - **No tree view panel** — Phase 5.
 - **No archive resolved** — Phase 5.
 - **Extension unit tests** — the VS Code Comments API cannot be unit-tested outside the extension host. Pure store logic is tested via the CLI tests. Extension behavior is covered by the manual testing guide.
+
+---
+
+## Phase 3: Content-Based Anchoring
+
+**Status:** Complete
+
+### What was built
+
+1. **Shared reconciliation core** (`shared/reconcile.js`)
+   - Added content-based re-anchoring algorithm shared by CLI and extension.
+   - Implemented the required fallback chain:
+     - fast-path match at stored line range,
+     - exact `targetContent` search (unique match only),
+     - fuzzy matching with `contextBefore`/`contextAfter` + target similarity + proximity.
+   - Added staleness/orphan handling for open comments:
+     - `open -> stale` when no confident match,
+     - `open -> orphaned` when file is missing.
+   - Added mtime-gated checks via `anchor.lastAnchorCheck` so unchanged files are skipped.
+   - Added anchor snapshot refresh on successful re-anchor (`startLine`, `endLine`, contexts, `targetContent`, `contentHash`, `lastAnchorCheck`).
+
+2. **CLI lazy reconciliation on reads** (`cli/feedback-cli.js`)
+   - Read commands now reconcile before returning output:
+     - `list`
+     - `get`
+     - `summary`
+     - `context`
+   - If reconciliation mutates comments, CLI persists the updated store atomically before rendering output.
+   - `context` now correctly fails for comments that became orphaned during reconciliation in that same invocation.
+
+3. **Extension reconciliation wiring** (`extension/src/extension.ts`, `extension/src/reconcile.ts`)
+   - Added extension wrapper module over shared reconciliation to keep behavior aligned with CLI.
+   - Implemented `Feedback: Reconcile All` command using `force` reconciliation.
+   - Implemented automatic file-scoped reconciliation triggers:
+     - on file open,
+     - on save,
+     - on document changes (debounced).
+   - For active editing, added thread-range persistence back to store (updates line range + anchor snapshot for open comments).
+   - Added consistent thread presentation updates (status-driven labels/context values) for open/resolved/stale/orphaned states.
+
+4. **Automated Phase 3 tests**
+   - Added reconciliation scenario tests (`test/cli/reconcile.test.js`) covering:
+     - insertion above target,
+     - content changes requiring fuzzy match,
+     - stale detection,
+     - orphan detection,
+     - force-based stale reopening.
+   - Added extension parity tests (`test/extension/reconcile.test.js`) comparing shared vs extension reconciliation outputs for the same fixtures.
+   - Updated root scripts (`package.json`) to run CLI + extension test suites:
+     - `npm test`
+     - `npm run test:cli`
+     - `npm run test:extension`
+
+### What was tested
+
+- `npm run test:cli` (all CLI + store + reconciliation tests pass)
+- `npm run test:extension` (extension compile + reconciliation parity tests pass)
+- `npm test` (full combined run passes)
+
+### Implementation decisions not in the spec
+
+- **Shared implementation chosen:** reconciler lives in `shared/reconcile.js` and is called by both CLI and extension to eliminate drift.
+- **Status transition scope:** automatic reconciliation changes status only for non-resolved comments. Resolved comments are not auto-transitioned to stale/orphaned.
+- **Auto vs force behavior:** non-force reconciliation processes only `open` comments; force mode (used by `Reconcile All`) includes stale/orphaned and can reopen them to `open` on a confident match.
+- **Fuzzy scoring:** weighted score uses context match, target-content similarity, and proximity to prior anchor with a threshold + ambiguity guard.
+- **Active editing strategy in extension:** document-change handling is debounced and persists VS Code thread range movement back to store so anchors stay aligned while typing.
+
+### What's known to be incomplete
+
+- **Manual stale/orphan re-anchor UX** in extension is still minimal (no dedicated interactive re-anchor flow yet; only force reconcile and automatic open-file updates exist).
+- **Phase 4 items remain:** full Setup Agent Integration (CLI deployment + skill generation).
+- **Phase 5 items remain:** tree view, archive-resolved workflow, and polish UX.

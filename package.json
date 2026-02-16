@@ -4,8 +4,9 @@
   "private": true,
   "description": "Inline bidirectional feedback between developers and AI agents",
   "scripts": {
-    "test": "node --test test/cli/*.test.js",
+    "test": "npm run test:cli && npm run test:extension",
     "test:cli": "node --test test/cli/*.test.js",
+    "test:extension": "npm run compile && node --test test/extension/*.test.js",
     "compile": "cd extension && npm run compile"
   }
 }
