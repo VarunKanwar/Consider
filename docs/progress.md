@@ -237,4 +237,5 @@
 ### What's known to be incomplete
 
 - **Phase 5 items remain:** tree view panel, archive resolved workflow, visual polish, and richer stale/orphan management UX.
+- **Phase 6 items remain:** Extension Host integration-test harness and command-level end-to-end automation strategy.
 - **Skill lifecycle management is basic:** setup can be rerun manually, but extension update-time skill versioning/regeneration policy is not yet implemented.

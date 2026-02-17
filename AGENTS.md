@@ -17,6 +17,7 @@ This project is built in phases. **Complete one phase fully before starting the 
 - **Phase 3: Content-based anchoring** — Re-anchoring algorithm in both CLI and extension. Mtime-based change detection. Staleness and orphan detection. This is the riskiest piece — test thoroughly.
 - **Phase 4: Agent integration setup** — "Setup Agent Integration" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
 - **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
+- **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
 
 When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
 
@@ -96,6 +97,8 @@ Use ESLint and Prettier with standard TypeScript configs. Run `npm run lint` and
 
 ## Testing expectations
 
+Use `docs/testing-strategy.md` as the repository-wide testing source of truth for merge/release gates and integration-test roadmap decisions.
+
 Every phase must include tests. What "tests" means varies by phase:
 
 **Phase 1 (CLI):** Automated tests. Create test fixtures (sample `store.json` files), run CLI commands, verify output. Test each command with normal input, edge cases (empty store, nonexistent ID, missing file), and the `--json` flag. A simple test runner using Node's built-in `node:test` and `node:assert` is fine — no test framework dependencies in the CLI.
@@ -107,6 +110,8 @@ Every phase must include tests. What "tests" means varies by phase:
 **Phase 4 (Agent setup):** Verify the setup command creates correct directory structure, generates valid skill files, appends to `.gitignore` without duplicates. Test with and without existing `.claude/`, `.opencode/`, `AGENTS.md` directories.
 
 **Phase 5 (Polish):** Manual testing for UI features (tree view, archive). Automated tests for any new logic.
+
+**Phase 6 (Testing hardening):** Add Extension Host integration tests for setup command, add-comment command path, watcher-driven reply rendering, and reconciliation scenarios in fixture workspaces. Define CI split between PR-gating tests and slower release/nightly smoke tests.
 
 ## Commit conventions
 

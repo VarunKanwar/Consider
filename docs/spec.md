@@ -515,6 +515,8 @@ The recommended build order, with each step producing a usable increment:
 
 **Phase 5: Polish** — Tree view panel for all comments, archive/cleanup for resolved threads, visual refinements (stale/orphaned indicators), Reconcile All command, stale comment management UX.
 
+**Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) to validate command-level end-to-end behavior in fixture workspaces. Keep `npm test` as a fast PR gate and add slower UI/host smoke checks as release/nightly verification.
+
 ---
 
 ## 12. Success Criteria

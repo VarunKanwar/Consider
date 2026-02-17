@@ -34,6 +34,7 @@ Under active development. See `docs/spec.md` for the full technical specificatio
 - **`docs/spec.md`** — Complete technical specification: problem statement, architecture, data model, anchoring algorithm, agent integration, build phases.
 - **`docs/progress.md`** — Build log tracking phase completion and implementation decisions.
 - **`docs/manual-testing.md`** — Step-by-step manual testing procedures.
+- **`docs/testing-strategy.md`** — Repository-wide testing policy, merge gate, and integration-test roadmap.
 - **`AGENTS.md`** — Development instructions for AI coding agents working on this repo.
 
 ## License
