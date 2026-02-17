@@ -18,8 +18,14 @@ This project is built in phases. **Complete one phase fully before starting the 
 - **Phase 4: Agent integration setup** — "Setup Agent Integration" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
 - **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
 - **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
+- **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.feedback/` fixed at project root, and make agent skill installation explicit opt-in (not implicit side effect).
 
 When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
+
+## Documentation governance
+
+- Substantial product/architecture/workflow changes must be reflected in docs during the same change (at minimum: `docs/spec.md`, `docs/progress.md`, and any affected policy docs).
+- Prefer maintaining a finite, stable docs set over adding new one-off docs. Extend existing source-of-truth files unless a new document is clearly necessary.
 
 ## What not to build
 
@@ -127,6 +133,8 @@ Every phase must include tests. What "tests" means varies by phase:
 **Phase 5 (Polish):** Manual testing for UI features (tree view, archive). Automated tests for any new logic.
 
 **Phase 6 (Testing hardening):** Add Extension Host integration tests for setup command, add-comment command path, watcher-driven reply rendering, and reconciliation scenarios in fixture workspaces. Define CI split between PR-gating tests and slower release/nightly smoke tests.
+
+**Phase 7 (Onboarding and installation UX):** Add automated tests for setup-flow decision logic plus manual tests for first-run UX. Verify explicit consent behavior (no skill writes unless selected), idempotent reruns, and clear setup summaries.
 
 ## Commit conventions
 

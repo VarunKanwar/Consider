@@ -368,3 +368,21 @@
 - **Host scenarios should expand further:** watcher-driven reply rendering and reconciliation edit-path assertions are not yet covered in host suite.
 - **Click-level UI automation is still separate:** no full mouse-driven UI automation suite is part of PR gating.
 - **Branch protection cannot be enforced from this repository state:** GitHub API rejects protection changes (`HTTP 403`) until repository plan/visibility supports the feature.
+
+---
+
+## Phase 7: Onboarding and Installation UX (Planned)
+
+**Status:** Planned
+
+### Planned scope
+
+1. Add extension-first guided setup flow for first-time users.
+2. Keep feedback store location fixed at `<project-root>/.feedback/` for v1.
+3. Make agent integration writes (skills / AGENTS section) explicit opt-in, not implicit.
+4. Improve setup discoverability with clear prompts and post-setup summary.
+
+### Planned validation
+
+1. Automated tests for setup decision paths and idempotency.
+2. Manual tests for first-run discoverability and consent UX.

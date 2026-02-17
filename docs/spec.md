@@ -395,12 +395,14 @@ When the developer runs "Feedback: Setup Agent Integration":
 1. Create `.feedback/` directory if it doesn't exist.
 2. Create `.feedback/bin/` and copy/generate the CLI tool files.
 3. Add `.feedback/` to `.gitignore` (append if `.gitignore` exists, create if not). Check for existing entries to avoid duplicates.
-4. Detect which agent systems are present:
-   - If `.claude/` exists → drop skill file there.
-   - If `.opencode/` exists → drop skill file there.
-   - If `AGENTS.md` exists → append feedback section.
-   - If none are detected, ask the developer which agents they use (or just drop all of them — the files are small and harmless).
-5. Print a summary of what was set up.
+4. Run a guided setup flow (extension-first onboarding) with explicit choices:
+   - Initialize/repair project-local Feedback Loop files (required baseline).
+   - Add `.feedback/` to `.gitignore` (recommended default: yes).
+   - Install/update agent integrations (optional, explicit opt-in).
+5. If integrations are selected, detect existing agent footprints and let the developer confirm targets (Claude/OpenCode/Codex) before writing files.
+6. Print a summary of what was set up.
+
+For v1, the feedback store location remains fixed at `<project-root>/.feedback/` and is not user-configurable.
 
 ### 8.3 No MCP (For Now)
 
@@ -516,6 +518,8 @@ The recommended build order, with each step producing a usable increment:
 **Phase 5: Polish** — Tree view panel for all comments, archive/cleanup for resolved threads, visual refinements (stale/orphaned indicators), Reconcile All command, stale comment management UX.
 
 **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) to validate command-level end-to-end behavior in fixture workspaces. Keep `npm test` as a fast PR gate and add slower UI/host smoke checks as release/nightly verification.
+
+**Phase 7: Onboarding and installation UX** — Replace implicit setup side effects with a guided setup flow in the extension. Keep `.feedback/` at project root for v1, make agent integration writes explicit opt-in, and improve first-run discoverability/documentation for end users.
 
 ---
 
