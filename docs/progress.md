@@ -239,3 +239,58 @@
 - **Phase 5 items remain:** tree view panel, archive resolved workflow, visual polish, and richer stale/orphan management UX.
 - **Phase 6 items remain:** Extension Host integration-test harness and command-level end-to-end automation strategy.
 - **Skill lifecycle management is basic:** setup can be rerun manually, but extension update-time skill versioning/regeneration policy is not yet implemented.
+
+---
+
+## Phase 5: Polish
+
+**Status:** Complete
+
+### What was built
+
+1. **Comments tree view panel** (`extension/package.json`, `extension/src/extension.ts`, `extension/src/tree-data.ts`)
+   - Added Explorer view contribution: `Feedback Comments`.
+   - Implemented grouped-by-file tree data with status filtering (`all/open/resolved/stale/orphaned`).
+   - Implemented `Feedback: Show All Comments` command flow:
+     - prompts for status filter,
+     - updates tree provider filter,
+     - focuses the comments view.
+   - Tree comment items open and reveal their anchored location in editor.
+
+2. **Archive resolved workflow** (`extension/src/archive.ts`, `extension/src/extension.ts`)
+   - Implemented `Feedback: Archive Resolved`.
+   - Resolved comments are moved from active `.feedback/store.json` into `.feedback/archive.json`.
+   - Archive writes use atomic temp-file + rename.
+   - Re-running archive with no resolved comments returns a no-op message.
+
+3. **Visual refinements**
+   - Threads default to collapsed on create/load.
+   - Tree items include status-sensitive icons and concise metadata (`status • id`).
+
+4. **Manual testing updates** (`docs/manual-testing.md`)
+   - Added dedicated tests for:
+     - comments tree view behavior,
+     - archive resolved behavior.
+   - Renumbered and expanded the manual checklist to 15 scenarios.
+
+5. **Automated tests for new pure logic**
+   - `test/extension/archive.test.js` for archive behavior and idempotency.
+   - `test/extension/tree-data.test.js` for filter/group/sort behavior in the tree data model.
+
+### What was tested
+
+- `npm run compile`
+- `npm run test:extension` (archive + setup + reconciliation parity + tree data tests)
+- `npm test` (full CLI + extension suite)
+
+### Implementation decisions not in the spec
+
+- **Archive file format:** `.feedback/archive.json` stores records as `{ archivedAt, comment }` to preserve audit history and timestamp of archival.
+- **Tree view filtering UX:** filter is selected via `Feedback: Show All Comments` command rather than hardcoded per-view filter controls.
+- **Open-from-tree behavior:** selecting a tree comment opens file and reveals anchor line, but does not force comment widget expansion.
+
+### What's known to be incomplete
+
+- **Phase 6 items remain:** VS Code Extension Host integration-test harness and command-level end-to-end automation.
+- **Advanced stale/orphan UX remains basic:** no dedicated interactive “re-anchor this stale comment” flow yet.
+- **Skill lifecycle management remains basic:** setup can be rerun manually; extension update-time skill version checks are not yet implemented.

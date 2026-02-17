@@ -12,6 +12,8 @@ import {
 } from './store';
 import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
 import { runSetupAgentIntegration } from './setup';
+import { archiveResolvedComments } from './archive';
+import { CommentStatusFilter, groupCommentsByFile } from './tree-data';
 
 // --- Comment author labels ---
 const HUMAN_AUTHOR: vscode.CommentAuthorInformation = {
@@ -49,6 +51,125 @@ class FeedbackReply implements vscode.Comment {
   }
 }
 
+interface FeedbackFileNode {
+  kind: 'file';
+  file: string;
+  comments: FeedbackComment[];
+}
+
+interface FeedbackCommentNode {
+  kind: 'comment';
+  comment: FeedbackComment;
+}
+
+type FeedbackTreeNode = FeedbackFileNode | FeedbackCommentNode;
+
+function formatCommentLineRange(comment: FeedbackComment): string {
+  const { startLine, endLine } = comment.anchor;
+  if (startLine === endLine) {
+    return `L${startLine}`;
+  }
+  return `L${startLine}-${endLine}`;
+}
+
+function truncateTreeText(value: string, max = 90): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 3)}...`;
+}
+
+class FeedbackCommentsTreeProvider
+  implements vscode.TreeDataProvider<FeedbackTreeNode> {
+  private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
+    FeedbackTreeNode | undefined | void
+  >();
+  readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
+
+  private comments: FeedbackComment[] = [];
+  private statusFilter: CommentStatusFilter = 'all';
+
+  constructor(private projectRoot: string) {}
+
+  setStore(store: FeedbackStore): void {
+    this.comments = store.comments.slice();
+    this.refresh();
+  }
+
+  setStatusFilter(statusFilter: CommentStatusFilter): void {
+    this.statusFilter = statusFilter;
+    this.refresh();
+  }
+
+  getStatusFilter(): CommentStatusFilter {
+    return this.statusFilter;
+  }
+
+  refresh(): void {
+    this.onDidChangeTreeDataEmitter.fire();
+  }
+
+  getTreeItem(element: FeedbackTreeNode): vscode.TreeItem {
+    if (element.kind === 'file') {
+      const item = new vscode.TreeItem(
+        element.file,
+        vscode.TreeItemCollapsibleState.Collapsed
+      );
+      item.description = `${element.comments.length} comment${
+        element.comments.length === 1 ? '' : 's'
+      }`;
+      item.tooltip = `${element.file}\n${element.comments.length} feedback comment${
+        element.comments.length === 1 ? '' : 's'
+      }`;
+      item.iconPath = new vscode.ThemeIcon('file-code');
+      return item;
+    }
+
+    const { comment } = element;
+    const item = new vscode.TreeItem(
+      `${formatCommentLineRange(comment)} ${truncateTreeText(comment.body, 72)}`,
+      vscode.TreeItemCollapsibleState.None
+    );
+    item.description = `${comment.status} • ${comment.id}`;
+    item.tooltip = `${comment.file}:${comment.anchor.startLine}\n\n${comment.body}`;
+    item.iconPath = comment.status === 'resolved'
+      ? new vscode.ThemeIcon('pass')
+      : comment.status === 'stale'
+        ? new vscode.ThemeIcon('warning')
+        : comment.status === 'orphaned'
+          ? new vscode.ThemeIcon('question')
+          : new vscode.ThemeIcon('comment');
+    item.command = {
+      command: 'feedback-loop.openCommentFromTree',
+      title: 'Open Feedback Comment',
+      arguments: [comment.id],
+    };
+    item.contextValue = `feedback-comment-${comment.status}`;
+    return item;
+  }
+
+  getChildren(element?: FeedbackTreeNode): FeedbackTreeNode[] {
+    if (!element) {
+      return groupCommentsByFile(this.comments, this.statusFilter).map(
+        (group) =>
+          ({
+            kind: 'file',
+            file: group.file,
+            comments: group.comments,
+          }) satisfies FeedbackFileNode
+      );
+    }
+    if (element.kind === 'file') {
+      return element.comments.map(
+        (comment) =>
+          ({
+            kind: 'comment',
+            comment,
+          }) satisfies FeedbackCommentNode
+      );
+    }
+    return [];
+  }
+}
+
 /**
  * Main extension controller. Manages the CommentController, store sync,
  * and file watching.
@@ -63,6 +184,8 @@ class FeedbackLoopController {
    * Lets us update threads when the store changes externally (agent replies).
    */
   private threadMap: Map<string, vscode.CommentThread> = new Map();
+  private commentsTreeProvider: FeedbackCommentsTreeProvider;
+  private commentsTreeView: vscode.TreeView<FeedbackTreeNode>;
 
   /** Debounce flag to avoid re-reading store during our own writes */
   private suppressWatcher = false;
@@ -70,6 +193,11 @@ class FeedbackLoopController {
 
   constructor(private context: vscode.ExtensionContext) {
     this.projectRoot = this.getProjectRoot();
+    this.commentsTreeProvider = new FeedbackCommentsTreeProvider(this.projectRoot);
+    this.commentsTreeView = vscode.window.createTreeView('feedback-loop.comments', {
+      treeDataProvider: this.commentsTreeProvider,
+      showCollapseAll: true,
+    });
 
     this.commentController = vscode.comments.createCommentController(
       'feedback-loop',
@@ -90,6 +218,7 @@ class FeedbackLoopController {
       placeHolder: 'Type your feedback here',
     };
     this.disposables.push(this.commentController);
+    this.disposables.push(this.commentsTreeView);
 
     this.registerCommands();
     this.setupStoreWatcher();
@@ -176,22 +305,27 @@ class FeedbackLoopController {
       )
     );
 
-    // Show All Comments (Phase 5 stub)
+    // Show All Comments (tree view + status filter)
     this.disposables.push(
       vscode.commands.registerCommand('feedback-loop.showAllComments', () => {
-        vscode.window.showInformationMessage(
-          'Feedback: Show All Comments — coming in Phase 5.'
-        );
+        void this.handleShowAllComments();
       })
     );
 
-    // Archive Resolved (Phase 5 stub)
+    // Archive Resolved
     this.disposables.push(
       vscode.commands.registerCommand('feedback-loop.archiveResolved', () => {
-        vscode.window.showInformationMessage(
-          'Feedback: Archive Resolved — coming in Phase 5.'
-        );
+        this.handleArchiveResolved();
       })
+    );
+
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        'feedback-loop.openCommentFromTree',
+        (commentId: string) => {
+          void this.handleOpenCommentFromTree(commentId);
+        }
+      )
     );
 
     // Reconcile All
@@ -461,6 +595,94 @@ class FeedbackLoopController {
     }
   }
 
+  private async handleShowAllComments(): Promise<void> {
+    const filterOptions: Array<{ label: string; value: CommentStatusFilter }> = [
+      { label: 'All statuses', value: 'all' },
+      { label: 'Open only', value: 'open' },
+      { label: 'Resolved only', value: 'resolved' },
+      { label: 'Stale only', value: 'stale' },
+      { label: 'Orphaned only', value: 'orphaned' },
+    ];
+
+    const selected = await vscode.window.showQuickPick(filterOptions, {
+      placeHolder: 'Choose which feedback status to show in the Feedback Comments view',
+      ignoreFocusOut: true,
+    });
+    if (!selected) {
+      return;
+    }
+
+    this.commentsTreeProvider.setStatusFilter(selected.value);
+
+    try {
+      await vscode.commands.executeCommand('feedback-loop.comments.focus');
+    } catch {
+      await vscode.commands.executeCommand('workbench.view.explorer');
+    }
+  }
+
+  private handleArchiveResolved(): void {
+    const store = readStore(this.projectRoot);
+    const result = archiveResolvedComments(this.projectRoot, store);
+    if (result.archivedCount === 0) {
+      vscode.window.showInformationMessage(
+        'Feedback: No resolved comments to archive.'
+      );
+      return;
+    }
+
+    this.writeStoreSuppress(store);
+    this.reloadFromStore();
+
+    vscode.window.showInformationMessage(
+      `Feedback: Archived ${result.archivedCount} resolved comment${
+        result.archivedCount === 1 ? '' : 's'
+      } to .feedback/archive.json.`
+    );
+  }
+
+  private async handleOpenCommentFromTree(commentId: string): Promise<void> {
+    if (!commentId) return;
+
+    const store = readStore(this.projectRoot);
+    const comment = findComment(store, commentId);
+    if (!comment) {
+      vscode.window.showWarningMessage(
+        `Feedback comment ${commentId} was not found in the store.`
+      );
+      return;
+    }
+
+    const filePath = path.join(this.projectRoot, comment.file);
+    let fileExists = true;
+    try {
+      await vscode.workspace.fs.stat(vscode.Uri.file(filePath));
+    } catch {
+      fileExists = false;
+    }
+    if (!fileExists) {
+      vscode.window.showWarningMessage(
+        `Feedback comment ${commentId} points to missing file: ${comment.file}`
+      );
+      return;
+    }
+
+    const document = await vscode.workspace.openTextDocument(filePath);
+    const editor = await vscode.window.showTextDocument(document, {
+      preview: false,
+      preserveFocus: false,
+    });
+
+    const startLine = Math.max(0, comment.anchor.startLine - 1);
+    const endLine = Math.max(startLine, comment.anchor.endLine - 1);
+    const targetRange = new vscode.Range(startLine, 0, endLine, 0);
+    editor.selection = new vscode.Selection(targetRange.start, targetRange.start);
+    editor.revealRange(
+      targetRange,
+      vscode.TextEditorRevealType.InCenterIfOutsideViewport
+    );
+  }
+
   private handleReconcileAll(): void {
     const store = readStore(this.projectRoot);
     const result = reconcileStoreForExtension(this.projectRoot, store, { force: true });
@@ -655,6 +877,7 @@ class FeedbackLoopController {
       // Store might be mid-write or corrupt temporarily; ignore
       return;
     }
+    this.commentsTreeProvider.setStore(store);
 
     // Build a set of comment IDs in the store for diffing
     const storeIds = new Set(store.comments.map((c) => c.id));
@@ -730,6 +953,7 @@ class FeedbackLoopController {
     } catch {
       return; // No store yet
     }
+    this.commentsTreeProvider.setStore(store);
 
     for (const comment of store.comments) {
       this.createThreadFromStore(comment);
@@ -827,6 +1051,7 @@ class FeedbackLoopController {
    */
   private writeStoreSuppress(store: FeedbackStore): void {
     this.suppressWatcher = true;
+    this.commentsTreeProvider.setStore(store);
     writeStore(this.projectRoot, store);
     // Re-enable watcher after a short delay to let the file event settle
     setTimeout(() => {

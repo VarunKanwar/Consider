@@ -108,7 +108,29 @@ This is the key test for the file watcher.
    - All comments are tracked in a single `store.json`.
    - `feedback-cli list` shows all comments.
 
-## Test 11: CLI Summary Check
+## Test 11: Show All Comments Tree View
+
+1. Ensure you have comments across at least two files and mixed statuses.
+2. Run **Feedback: Show All Comments**.
+3. Pick a filter (e.g., **Open only**).
+4. **Expected:**
+   - Explorer shows a **Feedback Comments** view.
+   - Comments are grouped by file.
+   - Comment rows show status and comment ID in the description.
+   - Selecting a comment row opens the target file and reveals the anchor line.
+   - Filter choice updates visible comments by status.
+
+## Test 12: Archive Resolved
+
+1. Resolve one or more comment threads.
+2. Run **Feedback: Archive Resolved**.
+3. **Expected:**
+   - Resolved comments are removed from `.feedback/store.json`.
+   - Archived records are appended to `.feedback/archive.json`.
+   - Open/stale/orphaned comments remain in active store.
+   - Running again with no resolved comments reports a no-op message.
+
+## Test 13: CLI Summary Check
 
 1. With several comments in the store, run:
    ```sh
@@ -116,7 +138,7 @@ This is the key test for the file watcher.
    ```
 2. **Expected:** Shows the correct count of open comments and files.
 
-## Test 12: Setup Idempotency
+## Test 14: Setup Idempotency
 
 1. Run **Feedback: Setup Agent Integration** twice.
 2. **Expected:**
@@ -124,7 +146,7 @@ This is the key test for the file watcher.
    - No duplicate Feedback Loop section in `AGENTS.md`.
    - Existing skill files are refreshed, not duplicated with extra copies.
 
-## Test 13: No Workspace Folder
+## Test 15: No Workspace Folder
 
 1. Open VS Code with no folder open (File > Close Folder).
 2. Launch the extension (F5).
