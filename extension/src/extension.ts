@@ -6,13 +6,12 @@ import {
   generateCommentId,
   generateReplyId,
   findComment,
-  storePath,
-  emptyStore,
   FeedbackComment,
   FeedbackStore,
   Reply,
 } from './store';
 import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
+import { runSetupAgentIntegration } from './setup';
 
 // --- Comment author labels ---
 const HUMAN_AUTHOR: vscode.CommentAuthorInformation = {
@@ -432,19 +431,34 @@ class FeedbackLoopController {
   }
 
   private handleSetupAgentIntegration(): void {
-    // Phase 2: minimal stub — just ensure .feedback/ directory exists
-    const fs = require('fs') as typeof import('fs');
-    const feedbackDir = path.join(this.projectRoot, '.feedback');
-    if (!fs.existsSync(feedbackDir)) {
-      fs.mkdirSync(feedbackDir, { recursive: true });
+    try {
+      const result = runSetupAgentIntegration(this.projectRoot, {
+        cliSourceDir: path.resolve(this.context.extensionPath, '..', 'cli'),
+      });
+
+      const summary: string[] = [];
+      summary.push('.feedback scaffolding ready');
+      summary.push('CLI deployed to .feedback/bin');
+      if (result.gitignoreUpdated) {
+        summary.push('.gitignore updated');
+      }
+      if (result.skillsWritten.length > 0) {
+        summary.push(`skills written (${result.skillsWritten.length})`);
+      }
+      if (result.codexSectionUpdated) {
+        summary.push('AGENTS.md updated');
+      }
+      if (result.usedFallbackToAllAgents) {
+        summary.push('no existing agent config detected; installed all integrations');
+      }
+
+      vscode.window.showInformationMessage(
+        `Feedback Loop setup complete: ${summary.join(', ')}.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Feedback setup failed: ${message}`);
     }
-    const sp = storePath(this.projectRoot);
-    if (!fs.existsSync(sp)) {
-      writeStore(this.projectRoot, emptyStore());
-    }
-    vscode.window.showInformationMessage(
-      'Feedback Loop: .feedback/ directory initialized. Full agent setup coming in Phase 4.'
-    );
   }
 
   private handleReconcileAll(): void {

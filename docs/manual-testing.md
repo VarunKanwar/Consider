@@ -13,12 +13,19 @@
 3. A new VS Code window (Extension Development Host) should open.
 4. **Expected:** No errors in the Debug Console. The extension is active immediately on startup (no command needed first).
 
-## Test 2: Setup Agent Integration (Stub)
+## Test 2: Setup Agent Integration
 
 1. In the Extension Development Host window, open any project folder.
 2. Open the Command Palette (Cmd+Shift+P / Ctrl+Shift+P).
 3. Run **Feedback: Setup Agent Integration**.
-4. **Expected:** A `.feedback/` directory is created in the workspace root. An info message appears saying the directory was initialized.
+4. **Expected:**
+   - `.feedback/store.json` exists.
+   - `.feedback/bin/feedback-cli` and `.feedback/bin/feedback-cli.js` exist.
+   - `.gitignore` contains `.feedback/` exactly once.
+   - If `.claude/` exists, `.claude/skills/feedback-loop/SKILL.md` is written.
+   - If `.opencode/` exists, `.opencode/skills/feedback-loop/SKILL.md` is written.
+   - If `AGENTS.md` exists, a Feedback Loop section is appended/updated.
+   - If none of those agent configs exist, setup creates all three integrations.
 
 ## Test 3: Add a Comment
 
@@ -76,7 +83,7 @@ This is the key test for the file watcher.
 3. Open a terminal in the project directory.
 4. Run:
    ```sh
-   node <path-to-repo>/cli/feedback-cli.js reply c_abc12345 --message "I will fix this."
+   .feedback/bin/feedback-cli reply c_abc12345 --message "I will fix this."
    ```
    (Use the actual comment ID from your store.)
 5. **Expected:**
@@ -105,11 +112,19 @@ This is the key test for the file watcher.
 
 1. With several comments in the store, run:
    ```sh
-   node <path-to-repo>/cli/feedback-cli.js summary
+   .feedback/bin/feedback-cli summary
    ```
 2. **Expected:** Shows the correct count of open comments and files.
 
-## Test 12: No Workspace Folder
+## Test 12: Setup Idempotency
+
+1. Run **Feedback: Setup Agent Integration** twice.
+2. **Expected:**
+   - No duplicate `.feedback/` entries in `.gitignore`.
+   - No duplicate Feedback Loop section in `AGENTS.md`.
+   - Existing skill files are refreshed, not duplicated with extra copies.
+
+## Test 13: No Workspace Folder
 
 1. Open VS Code with no folder open (File > Close Folder).
 2. Launch the extension (F5).

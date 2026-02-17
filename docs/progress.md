@@ -171,3 +171,70 @@
 - **Manual stale/orphan re-anchor UX** in extension is still minimal (no dedicated interactive re-anchor flow yet; only force reconcile and automatic open-file updates exist).
 - **Phase 4 items remain:** full Setup Agent Integration (CLI deployment + skill generation).
 - **Phase 5 items remain:** tree view, archive-resolved workflow, and polish UX.
+
+---
+
+## Phase 4: Agent Integration Setup
+
+**Status:** Complete
+
+### What was built
+
+1. **Setup module for agent integration** (`extension/src/setup.ts`)
+   - Added `runSetupAgentIntegration(projectRoot, { cliSourceDir })` as the Phase 4 implementation core.
+   - Creates `.feedback/` and `.feedback/bin/` if missing.
+   - Creates `.feedback/store.json` if missing (using existing atomic store write path).
+   - Copies CLI artifacts into project-local deploy target:
+     - `.feedback/bin/feedback-cli`
+     - `.feedback/bin/feedback-cli.js`
+   - Ensures shell wrapper remains executable (`chmod 755`).
+   - Updates `.gitignore` with `.feedback/` exactly once (no duplicates).
+   - Detects agent footprints and installs integrations per spec behavior:
+     - Claude Code skill: `.claude/skills/feedback-loop/SKILL.md`
+     - OpenCode skill: `.opencode/skills/feedback-loop/SKILL.md`
+     - Codex docs section in `AGENTS.md` (upserted via markers).
+   - Implements fallback mode: when no agent config is detected, installs all three integrations.
+
+2. **Extension command wiring** (`extension/src/extension.ts`)
+   - Replaced Setup command stub with full setup execution.
+   - Setup command now reports an actionable summary (CLI deployed, gitignore updated, skills written, AGENTS section updated, fallback mode used when applicable).
+   - Added explicit error handling with clear surfaced message if setup fails.
+
+3. **Codex/skill idempotency handling**
+   - Codex section in `AGENTS.md` uses markers and upsert logic.
+   - Re-running setup updates existing section instead of appending duplicate blocks.
+
+4. **Phase 4 test coverage** (`test/extension/setup.test.js`)
+   - Added automated tests for setup behavior in four scenarios:
+     - detected agents present,
+     - no agents detected (fallback to all),
+     - partial detection behavior,
+     - idempotency for `.gitignore` and `AGENTS.md`.
+
+5. **Manual testing guide updates** (`docs/manual-testing.md`)
+   - Updated setup expectations to reflect full Phase 4 behavior.
+   - Switched CLI invocation examples to deployed wrapper (`.feedback/bin/feedback-cli`).
+   - Added explicit idempotency manual test.
+
+### What was tested
+
+- `npm run compile`
+- `npm run test:extension` (includes setup tests and reconciliation parity tests)
+- `npm test` (full CLI + extension suites)
+- Manual sanity checks during development:
+  - setup command activation from Command Palette,
+  - comment gutter availability on startup,
+  - add-comment from Command Palette,
+  - default collapsed thread presentation.
+
+### Implementation decisions not in the spec
+
+- **Codex section upsert markers:** used HTML markers in `AGENTS.md` to make repeated setup deterministic and avoid duplicates.
+- **Fallback strategy chosen:** when no `.claude/`, `.opencode/`, or `AGENTS.md` exists, setup creates all integrations automatically (no interactive prompt).
+- **Skill content is shared structure with agent-specific label:** Claude/OpenCode skill files share core command/convention text, with only installed-for labeling varied.
+- **Setup logic extracted from extension controller:** pure setup behavior lives in `setup.ts` to enable reliable automated tests outside extension host.
+
+### What's known to be incomplete
+
+- **Phase 5 items remain:** tree view panel, archive resolved workflow, visual polish, and richer stale/orphan management UX.
+- **Skill lifecycle management is basic:** setup can be rerun manually, but extension update-time skill versioning/regeneration policy is not yet implemented.
