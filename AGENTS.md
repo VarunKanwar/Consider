@@ -100,6 +100,12 @@ npm run test:full               # Fast suite + Extension Host integration suite
 
 Set up these npm scripts during Phase 1/2 scaffolding. Adjust as needed but keep the top-level `npm test` working at all times.
 
+### CI and merge checks
+
+- GitHub Actions workflow `CI` runs on PRs and pushes to `main`.
+- Required PR status check for merge target: `CI / fast-tests` (when branch protection is available/enabled for the repository plan/visibility).
+- Extension-host workflow `Extension Host` runs on schedule/manual trigger and is not the PR gate.
+
 ### Linting and formatting
 
 Use ESLint and Prettier with standard TypeScript configs. Run `npm run lint` and `npm run format`. Configure these during scaffolding. Do not deviate from standard community configs unless there's a specific reason.

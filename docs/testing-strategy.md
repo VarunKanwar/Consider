@@ -75,9 +75,21 @@ Notes:
 
 Before merging:
 
-1. `npm test` must pass.
-2. If extension UX behavior changed, execute relevant checks in `docs/manual-testing.md`.
-3. Update `docs/progress.md` for phase-level changes and testing evidence.
+1. Required GitHub status check `CI / fast-tests` must pass.
+2. `npm test` must pass locally before opening/updating PR.
+3. If extension UX behavior changed, execute relevant checks in `docs/manual-testing.md`.
+4. Update `docs/progress.md` for phase-level changes and testing evidence.
+
+## Branch Protection
+
+Protect `main` with:
+
+1. Require a pull request before merging.
+2. Require status checks to pass before merging: `CI / fast-tests`.
+3. Require branches to be up to date before merging.
+4. Require at least one approving review.
+
+Note: GitHub branch protection availability depends on repository visibility/plan. Keep `CI / fast-tests` configured regardless, and enable protection as soon as the repository supports it.
 
 ## Release Gate
 

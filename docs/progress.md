@@ -339,6 +339,13 @@
    - Updated test scripts to run compiled output under `test/out/` and ignored generated output via `.gitignore`.
    - Standardized compiled-test module resolution using repository-root paths (`process.cwd()`), so tests run correctly both pre-compile and post-compile.
 
+6. **GitHub Actions PR/merge check workflows**
+   - Added PR/main fast-suite workflow:
+     - `.github/workflows/ci.yml` (`CI / fast-tests`)
+   - Added scheduled/manual extension-host workflow:
+     - `.github/workflows/extension-host.yml` (`Extension Host / host-integration`)
+   - Updated testing policy docs to pin merge gate status-check name and branch-protection expectations.
+
 ### What was tested
 
 - `npm run compile`
@@ -346,15 +353,18 @@
 - `npm test`
 - `npm run test:extension:host` was executed in this environment and failed at VS Code test-build download with DNS/network resolution error:
   - `getaddrinfo ENOTFOUND update.code.visualstudio.com`
+- Attempted to apply `main` branch protection via GitHub API for required status checks and PR reviews; API returned repository plan/visibility restriction (`HTTP 403`).
 
 ### Implementation decisions not in the spec
 
 - **Host tests are a separate tier:** retained `npm test` as the fast deterministic gate; host integration tests run via dedicated script for release/nightly validation.
 - **Mocha retained for host harness:** used standard VS Code extension-host test pattern (Mocha + `@vscode/test-electron`) while keeping existing Node test runner for non-host suites.
 - **Language split policy documented:** extension runtime + fast tests are TypeScript; CLI/shared runtime and extension-host harness remain JavaScript for C5 compliance and lower harness friction.
+- **CI check naming made explicit:** workflow/job naming intentionally fixed to `CI / fast-tests` for stable branch-protection targeting.
 
 ### What's known to be incomplete
 
 - **Host test execution depends on network access:** first run requires downloading VS Code test binaries from Microsoft update servers.
 - **Host scenarios should expand further:** watcher-driven reply rendering and reconciliation edit-path assertions are not yet covered in host suite.
 - **Click-level UI automation is still separate:** no full mouse-driven UI automation suite is part of PR gating.
+- **Branch protection cannot be enforced from this repository state:** GitHub API rejects protection changes (`HTTP 403`) until repository plan/visibility supports the feature.
