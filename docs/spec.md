@@ -113,7 +113,7 @@ The directory structure:
 │   ├── store.js            # Shared store logic used by deployed CLI
 │   ├── reconcile.js        # Shared reconcile logic used by deployed CLI
 │   └── package.json        # {"type":"commonjs"} for local runtime scope
-└── config.json             # Optional: extension/CLI configuration
+└── config.json             # Setup tracking (e.g., installed skill locations)
 ```
 
 ### 4.2 Data Model
@@ -216,6 +216,29 @@ The extension should visually distinguish these — different icon colors, label
 
 The CLI reports these states clearly in its output so the agent can also understand which comments might be outdated.
 
+### 4.5 Setup Tracking Config
+
+In addition to `store.json`, setup/uninstall state is tracked in `.feedback/config.json`.
+
+```json
+{
+  "version": 1,
+  "trackedSkillInstalls": [
+    {
+      "target": "claude",
+      "scope": "project",
+      "path": "/absolute/path/to/.claude/skills/feedback-loop/SKILL.md"
+    }
+  ],
+  "lastUpdatedAt": "2026-02-17T12:34:56.000Z"
+}
+```
+
+Notes:
+- `path` is absolute for deterministic uninstall cleanup.
+- `trackedSkillInstalls` is merged idempotently across repeated setup runs.
+- If this file is missing or empty (older installs), uninstall falls back to known skill-path discovery.
+
 ---
 
 ## 5. VS Code Extension
@@ -241,6 +264,8 @@ The extension should register the following commands:
 **Feedback: Setup Agent Integration** — Runs a guided setup flow: initializes `.feedback/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
 
 On first run in a workspace without `.feedback/store.json`, the extension should surface a lightweight setup prompt so onboarding is discoverable without forcing side effects.
+
+**Feedback: Uninstall** — Runs a guided offboarding flow. The developer chooses between full uninstall (remove `.feedback/` + tracked skills) or skills-only uninstall (keep `.feedback/` data). See Section 8.3.
 
 **Feedback: Show All Comments** — Opens a tree view / panel showing all feedback across the project, grouped by file, filterable by status (open/resolved/stale/orphaned).
 
@@ -413,17 +438,33 @@ When the developer runs "Feedback: Setup Agent Integration":
 
 1. Create `.feedback/` directory if it doesn't exist.
 2. Create `.feedback/bin/` and copy/generate the CLI tool files.
-3. Show a single setup panel (extension-first onboarding) with explicit choices:
+3. Write/update `.feedback/config.json` with tracked skill install locations (target, scope, absolute path) so uninstall can remove exactly what setup installed.
+   - Repeated setup runs must merge this tracking idempotently.
+4. Show a single setup panel (extension-first onboarding) with explicit choices:
    - whether to add `.feedback/` to `.gitignore` (recommended default: yes),
    - which integrations to install (Claude/OpenCode/Codex),
    - one install location per selected integration (project-local or home-level).
    - allow leaving all integrations unchecked to skip skill installation for now.
-4. If `.gitignore` was selected, add `.feedback/` to `.gitignore` (append if `.gitignore` exists, create if not), avoiding duplicates.
-5. Print a summary of what was set up.
+5. If `.gitignore` was selected, add `.feedback/` to `.gitignore` (append if `.gitignore` exists, create if not), avoiding duplicates.
+6. Print a summary of what was set up.
 
 For v1, the feedback store location remains fixed at `<project-root>/.feedback/` and is not user-configurable. Skill install location is configurable per selected integration (project-local or home-level).
 
-### 8.3 No MCP (For Now)
+### 8.3 Uninstall / Offboarding
+
+When the developer runs "Feedback: Uninstall":
+
+1. Present an explicit offboarding choice:
+   - full uninstall (remove `.feedback/`, tracked skills, optional `.gitignore` entry cleanup), or
+   - skills-only uninstall (keep `.feedback/` data).
+2. Read tracked skill installs from `.feedback/config.json`.
+3. Remove tracked skill files/folders for the selected uninstall mode.
+   - If skills-only uninstall is selected, clear removed skill entries from `.feedback/config.json`.
+4. If no tracking data exists (older installs), fall back to discovering Feedback Loop skill files in known locations and remove those.
+5. Remove `.feedback/` when full uninstall is selected.
+6. Print a summary of removed/skipped artifacts.
+
+### 8.4 No MCP (For Now)
 
 We are deliberately not implementing an MCP server for v1. The rationale:
 
@@ -539,6 +580,8 @@ The recommended build order, with each step producing a usable increment:
 **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) to validate command-level end-to-end behavior in fixture workspaces. Keep `npm test` as a fast PR gate and add slower UI/host smoke checks as release/nightly verification.
 
 **Phase 7: Onboarding and installation UX** — Replace implicit setup side effects with a guided setup flow in the extension. Keep `.feedback/` at project root for v1, make agent integration writes explicit opt-in, and improve first-run discoverability/documentation for end users.
+
+**Phase 8: Offboarding and uninstall UX** — Add a dedicated uninstall flow that can remove Feedback Loop runtime files and installed skills safely. Track install locations at setup time and use that tracking for deterministic cleanup.
 
 ---
 

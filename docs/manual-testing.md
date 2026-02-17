@@ -166,7 +166,24 @@ This is the key test for the file watcher.
    - Existing skill files are refreshed in place (single file per target path for the selected install scope).
    - Codex skill exists at `.codex/skills/feedback-loop/SKILL.md` (workspace scope) or `~/.codex/skills/feedback-loop/SKILL.md` (home scope).
 
-## Test 15: No Workspace Folder
+## Test 15: Uninstall / Offboarding
+
+1. Ensure setup has run and at least one integration skill is installed.
+2. Run **Feedback: Uninstall** from the Command Palette.
+3. In the uninstall flow, choose **Skills only**.
+4. **Expected:**
+   - Installed skills tracked by setup are removed.
+   - `.feedback/store.json` remains.
+   - `.feedback/config.json` remains and tracked skill list is cleared.
+5. Run **Feedback: Setup Agent Integration** again and install at least one integration.
+6. Run **Feedback: Uninstall** and choose **Full uninstall**.
+7. **Expected:**
+   - `.feedback/` directory is removed.
+   - Tracked skills are removed.
+   - `.feedback/` entry is removed from `.gitignore` if present.
+   - Completion message summarizes removed/retained artifacts.
+
+## Test 16: No Workspace Folder
 
 1. Open VS Code with no folder open (File > Close Folder).
 2. Launch the extension (F5).

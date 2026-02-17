@@ -19,6 +19,7 @@ This project is built in phases. **Complete one phase fully before starting the 
 - **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
 - **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
 - **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.feedback/` fixed at project root, make agent skill installation explicit opt-in (not implicit side effect), and let users choose workspace vs home skill install scope.
+- **Phase 8: Offboarding and uninstall UX** — Add a guided uninstall flow and track setup artifact locations so skill/runtime cleanup is deterministic and safe.
 
 When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
 
@@ -30,7 +31,7 @@ When you finish a phase, update `docs/progress.md` with: what was built, what wa
 ## What not to build
 
 The spec distinguishes v1 from v2 explicitly. Do not build:
-- MCP server (Section 8.3 — deliberately deferred)
+- MCP server (Section 8.4 — deliberately deferred)
 - Label/tagging system (Section 9.2 — v2 enhancement)
 - Queue/dispatch model — comments are `open` on creation, no `queued` status
 - Complex build pipelines — the CLI is a single `.js` file with no build step
@@ -135,6 +136,8 @@ Every phase must include tests. What "tests" means varies by phase:
 **Phase 6 (Testing hardening):** Add Extension Host integration tests for setup command, add-comment command path, watcher-driven reply rendering, and reconciliation scenarios in fixture workspaces. Define CI split between PR-gating tests and slower release/nightly smoke tests.
 
 **Phase 7 (Onboarding and installation UX):** Add automated tests for setup-flow decision logic plus manual tests for first-run UX. Verify explicit consent behavior (no skill writes unless selected), idempotent reruns, and clear setup summaries.
+
+**Phase 8 (Offboarding and uninstall UX):** Add automated tests for uninstall path decisions and cleanup behavior (tracked skill removal, fallback detection for older installs, data-retain vs full-remove modes), plus manual tests for command UX and safety confirmations.
 
 ## Commit conventions
 

@@ -450,3 +450,60 @@
 ### What's known to be incomplete
 
 1. **Onboarding wizard remains command/prompt based:** no custom webview wizard has been added.
+
+---
+
+## Phase 8: Offboarding and Uninstall UX
+
+**Status:** Complete
+
+### What was built
+
+1. **Tracked install state in setup config** (`extension/src/setup.ts`)
+   - Setup now writes `.feedback/config.json` during setup runs.
+   - Config tracks installed skill locations with target + scope + absolute path.
+   - Repeated setup runs merge tracked installs idempotently.
+
+2. **Uninstall core behavior** (`extension/src/setup.ts`)
+   - Added `runUninstallAgentIntegration(projectRoot, options)` to support deterministic cleanup.
+   - Supports two modes:
+     - full uninstall (remove `.feedback/` and tracked skills),
+     - skills-only uninstall (remove tracked skills, keep `.feedback/`).
+   - Removes `.feedback/` entry from `.gitignore` when requested.
+   - Includes fallback skill discovery for older installs that predate config tracking.
+
+3. **Extension uninstall command flow** (`extension/src/extension.ts`, `extension/package.json`)
+   - Added command: `Feedback: Uninstall`.
+   - Added guided uninstall choices with explicit confirmation:
+     - full uninstall,
+     - skills-only uninstall.
+   - Completion summary reports what was removed/retained.
+
+4. **Automated test coverage updates**
+   - `test/extension/setup.test.ts` now covers:
+     - setup config tracking output,
+     - full uninstall cleanup,
+     - skills-only uninstall behavior,
+     - fallback discovery uninstall behavior.
+   - `extension/test/suite/extension.integration.test.js` now asserts setup writes config artifact.
+
+5. **Docs updates**
+   - Updated uninstall behavior and setup tracking in `docs/spec.md`.
+   - Added manual uninstall test procedure in `docs/manual-testing.md`.
+   - Updated phase plan docs (`AGENTS.md`) and user-facing README flow note.
+
+### What was tested
+
+1. `npm test` (full fast suite) after Phase 8 changes.
+2. Extended setup/uninstall unit tests in `test/extension/setup.test.ts`.
+3. Manual uninstall test procedure documented in `docs/manual-testing.md`.
+
+### Implementation decisions not in the spec
+
+1. **Config path ownership:** uninstall tracking state is stored in `.feedback/config.json` (same gitignored root as store/runtime files).
+2. **Fallback compatibility:** uninstall attempts fallback detection for known skill paths when tracking metadata is missing, to support older installs.
+3. **Safety scope:** uninstall removes only tracked Feedback Loop skill directories and prunes parent skill folders only when empty.
+
+### What's known to be incomplete
+
+1. **No selective per-agent uninstall UI yet:** uninstall currently offers two coarse modes (full vs skills-only), not per-agent toggles.

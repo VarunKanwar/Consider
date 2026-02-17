@@ -42,6 +42,7 @@ Under active development. See `docs/spec.md` for the full technical specificatio
 Notes:
 - Feedback data stays in fixed project-local path: `.feedback/`.
 - Agent integrations are explicit opt-in during setup, with per-integration install scope selection.
+- Offboarding is available via **Feedback: Uninstall** (full uninstall or skills-only mode).
 
 ## Documentation
 
