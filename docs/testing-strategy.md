@@ -14,11 +14,17 @@ This strategy is formalized as **Phase 6: Testing hardening** in the project bui
 2. Keep feedback loops fast for daily development.
 3. Maintain one explicit quality bar for merge and release decisions.
 
+## Language Policy
+
+1. Use TypeScript for extension runtime code (`extension/src/**`) and non-host automated tests (`test/**`), compiled with strict mode in `test/tsconfig.json` (with `noImplicitAny` intentionally relaxed for fixture-oriented helpers).
+2. Keep CLI/shared runtime code in JavaScript (`cli/**`, `shared/**`) to preserve C5 zero-dependency deploy constraints.
+3. Keep Extension Host harness files in JavaScript (`extension/test/**`) to avoid extra transpilation/bootstrap complexity inside the `@vscode/test-electron` launched process.
+
 ## Current Test Layers
 
 ### Layer 1: CLI + store contract tests (automated, required)
 
-- Location: `test/cli/`
+- Location: `test/cli/*.test.ts` (compiled to `test/out/cli/*.test.js`)
 - Scope:
   - store read/write and atomic writes
   - CLI command behavior and error handling
@@ -28,7 +34,7 @@ This strategy is formalized as **Phase 6: Testing hardening** in the project bui
 
 ### Layer 2: Extension logic tests (automated, required)
 
-- Location: `test/extension/`
+- Location: `test/extension/*.test.ts` (compiled to `test/out/extension/*.test.js`)
 - Scope:
   - shared reconciliation parity for extension wrappers
   - setup/integration file generation behavior

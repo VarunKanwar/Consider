@@ -1,10 +1,12 @@
+export {};
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { runSetupAgentIntegration } = require('../../extension/out/setup.js');
+const ROOT = process.cwd();
+const { runSetupAgentIntegration } = require(path.join(ROOT, 'extension', 'out', 'setup.js'));
 
 function makeTmpProject() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-setup-test-'));
@@ -138,4 +140,3 @@ describe('setup agent integration', () => {
     assert.equal(countOccurrences(agents, 'feedback-loop:codex:end'), 1);
   });
 });
-

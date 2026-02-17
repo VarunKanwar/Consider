@@ -1,3 +1,4 @@
+export {};
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -5,9 +6,10 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const reconcile = require('../../shared/reconcile.js');
+const ROOT = process.cwd();
+const reconcile = require(path.join(ROOT, 'shared', 'reconcile.js'));
 
-const CLI_PATH = path.join(__dirname, '..', '..', 'cli', 'feedback-cli.js');
+const CLI_PATH = path.join(ROOT, 'cli', 'feedback-cli.js');
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-reconcile-'));
@@ -142,7 +144,7 @@ describe('reconcile core', () => {
     assert.equal(result.updatedComments, 1);
     assert.equal(storeData.comments[0].anchor.startLine, 4);
     assert.equal(storeData.comments[0].status, 'open');
-    assert.equal(storeData.comments[0].anchor.contentHash.length, 8);
+    assert.equal((storeData.comments[0].anchor as any).contentHash.length, 8);
   });
 
   it('uses fuzzy context matching when target content changed', () => {
@@ -352,4 +354,3 @@ describe('cli lazy reconciliation', () => {
     assert.equal(persisted.comments[0].status, 'orphaned');
   });
 });
-

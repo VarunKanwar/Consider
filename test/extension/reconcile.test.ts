@@ -1,11 +1,13 @@
+export {};
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const sharedReconcile = require('../../shared/reconcile.js');
-const extensionReconcile = require('../../extension/out/reconcile.js');
+const ROOT = process.cwd();
+const sharedReconcile = require(path.join(ROOT, 'shared', 'reconcile.js'));
+const extensionReconcile = require(path.join(ROOT, 'extension', 'out', 'reconcile.js'));
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-ext-reconcile-'));
@@ -57,7 +59,11 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function expectParity(projectRoot, storeData, options) {
+function expectParity(
+  projectRoot,
+  storeData,
+  options: { force?: boolean; nowIso?: string } | undefined = undefined
+) {
   const deterministicNowIso = '2026-02-16T20:00:00.000Z';
   const optionsWithNow = {
     ...(options || {}),

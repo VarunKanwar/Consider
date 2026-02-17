@@ -71,6 +71,13 @@ This is a starting point. Adjust as needed during implementation, but explain st
 
 **Re-anchoring:** Both the CLI and extension implement this. The algorithm must produce identical results in both. Spec Section 4.3 has the full algorithm. Consider extracting into a shared `.js` file, but don't over-engineer the sharing mechanism.
 
+## Language policy
+
+- **Extension runtime code:** TypeScript (`extension/src/**`) with strict mode.
+- **Fast test suites:** TypeScript (`test/**`) compiled via `test/tsconfig.json` before running `node --test` (strict mode enabled with `noImplicitAny` relaxed for fixture-heavy tests).
+- **CLI and shared runtime:** JavaScript (`cli/**`, `shared/**`) to preserve the zero-dependency, no-build deploy model required by C5.
+- **Extension Host harness:** JavaScript (`extension/test/**`) to keep `@vscode/test-electron` bootstrap simple and avoid adding a second transpile/loader path for the VS Code-launched test process.
+
 ## Commands reference
 
 ### Build and test

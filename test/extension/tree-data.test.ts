@@ -1,10 +1,12 @@
+export {};
 const { describe, it } = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('path');
 
 const {
   filterCommentsByStatus,
   groupCommentsByFile,
-} = require('../../extension/out/tree-data.js');
+} = require(path.join(process.cwd(), 'extension', 'out', 'tree-data.js'));
 
 function makeComment(id, file, status, startLine, body) {
   return {
@@ -57,4 +59,3 @@ describe('tree data helpers', () => {
     assert.equal(groups[1].comments[0].status, 'open');
   });
 });
-

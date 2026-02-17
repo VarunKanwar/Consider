@@ -21,7 +21,7 @@
    - `summary [--json]` — shows open count, file count, and breakdown by status.
    - `context <id> [--lines N] [--json]` — shows the comment with surrounding code from the actual file, target lines marked with `>>>`.
 
-3. **Automated tests** (`test/cli/store.test.js`, `test/cli/cli.test.js`)
+3. **Automated tests** (`test/cli/store.test.ts`, `test/cli/cli.test.ts`)
    - 39 tests covering all commands, flags, edge cases (empty store, missing IDs, orphaned comments, nonexistent files).
    - Uses `node:test` and `node:assert` — no dependencies.
 
@@ -140,13 +140,13 @@
    - Added consistent thread presentation updates (status-driven labels/context values) for open/resolved/stale/orphaned states.
 
 4. **Automated Phase 3 tests**
-   - Added reconciliation scenario tests (`test/cli/reconcile.test.js`) covering:
+   - Added reconciliation scenario tests (`test/cli/reconcile.test.ts`) covering:
      - insertion above target,
      - content changes requiring fuzzy match,
      - stale detection,
      - orphan detection,
      - force-based stale reopening.
-   - Added extension parity tests (`test/extension/reconcile.test.js`) comparing shared vs extension reconciliation outputs for the same fixtures.
+   - Added extension parity tests (`test/extension/reconcile.test.ts`) comparing shared vs extension reconciliation outputs for the same fixtures.
    - Updated root scripts (`package.json`) to run CLI + extension test suites:
      - `npm test`
      - `npm run test:cli`
@@ -204,7 +204,7 @@
    - Codex section in `AGENTS.md` uses markers and upsert logic.
    - Re-running setup updates existing section instead of appending duplicate blocks.
 
-4. **Phase 4 test coverage** (`test/extension/setup.test.js`)
+4. **Phase 4 test coverage** (`test/extension/setup.test.ts`)
    - Added automated tests for setup behavior in four scenarios:
      - detected agents present,
      - no agents detected (fallback to all),
@@ -274,8 +274,8 @@
    - Renumbered and expanded the manual checklist to 15 scenarios.
 
 5. **Automated tests for new pure logic**
-   - `test/extension/archive.test.js` for archive behavior and idempotency.
-   - `test/extension/tree-data.test.js` for filter/group/sort behavior in the tree data model.
+   - `test/extension/archive.test.ts` for archive behavior and idempotency.
+   - `test/extension/tree-data.test.ts` for filter/group/sort behavior in the tree data model.
 
 ### What was tested
 
@@ -328,6 +328,17 @@
      - host-test network caveat and remaining gaps.
    - Updated `AGENTS.md` build/test command reference to include host/full test commands.
 
+5. **Fast-suite TypeScript migration**
+   - Migrated all non-host automated tests to TypeScript:
+     - `test/cli/*.test.ts`
+     - `test/extension/*.test.ts`
+   - Added `test/tsconfig.json` and root `test:prepare` script to compile tests before execution.
+   - Hardened test compilation setup:
+     - switched `test:prepare` to use `extension`'s `./node_modules/.bin/tsc` entrypoint (avoids brittle package-internal bin pathing),
+     - enabled strict mode in `test/tsconfig.json` while relaxing `noImplicitAny` for fixture-heavy suites.
+   - Updated test scripts to run compiled output under `test/out/` and ignored generated output via `.gitignore`.
+   - Standardized compiled-test module resolution using repository-root paths (`process.cwd()`), so tests run correctly both pre-compile and post-compile.
+
 ### What was tested
 
 - `npm run compile`
@@ -340,6 +351,7 @@
 
 - **Host tests are a separate tier:** retained `npm test` as the fast deterministic gate; host integration tests run via dedicated script for release/nightly validation.
 - **Mocha retained for host harness:** used standard VS Code extension-host test pattern (Mocha + `@vscode/test-electron`) while keeping existing Node test runner for non-host suites.
+- **Language split policy documented:** extension runtime + fast tests are TypeScript; CLI/shared runtime and extension-host harness remain JavaScript for C5 compliance and lower harness friction.
 
 ### What's known to be incomplete
 

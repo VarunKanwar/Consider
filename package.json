@@ -4,9 +4,12 @@
   "private": true,
   "description": "Inline bidirectional feedback between developers and AI agents",
   "scripts": {
-    "test": "npm run test:cli && npm run test:extension",
-    "test:cli": "node --test test/cli/*.test.js",
-    "test:extension": "npm run compile && node --test test/extension/*.test.js",
+    "test": "npm run test:prepare && npm run test:cli:run && npm run test:extension:run",
+    "test:prepare": "npm run compile && (cd extension && ./node_modules/.bin/tsc -p ../test/tsconfig.json)",
+    "test:cli": "npm run test:prepare && npm run test:cli:run",
+    "test:cli:run": "node --test test/out/cli/*.test.js",
+    "test:extension": "npm run test:prepare && npm run test:extension:run",
+    "test:extension:run": "node --test test/out/extension/*.test.js",
     "test:extension:host": "cd extension && npm run test:host",
     "test:full": "npm test && npm run test:extension:host",
     "compile": "cd extension && npm run compile"

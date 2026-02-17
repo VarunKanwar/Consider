@@ -1,10 +1,12 @@
+export {};
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const { archiveResolvedComments } = require('../../extension/out/archive.js');
+const ROOT = process.cwd();
+const { archiveResolvedComments } = require(path.join(ROOT, 'extension', 'out', 'archive.js'));
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-archive-test-'));
@@ -108,4 +110,3 @@ describe('archive resolved comments', () => {
     );
   });
 });
-

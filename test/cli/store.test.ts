@@ -1,9 +1,11 @@
+export {};
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const store = require('../../shared/store.js');
+const ROOT = process.cwd();
+const store = require(path.join(ROOT, 'shared', 'store.js'));
 
 function makeTmpDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-test-'));

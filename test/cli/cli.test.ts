@@ -1,3 +1,4 @@
+export {};
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -5,7 +6,8 @@ const path = require('path');
 const os = require('os');
 const { execFileSync } = require('child_process');
 
-const CLI_PATH = path.join(__dirname, '..', '..', 'cli', 'feedback-cli.js');
+const ROOT = process.cwd();
+const CLI_PATH = path.join(ROOT, 'cli', 'feedback-cli.js');
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-cli-test-'));
