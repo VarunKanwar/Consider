@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
 import {
   readStore,
@@ -11,7 +12,12 @@ import {
   Reply,
 } from './store';
 import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
-import { runSetupAgentIntegration } from './setup';
+import {
+  detectAgentIntegrations,
+  getDetectedIntegrationTargets,
+  runSetupAgentIntegration,
+  SetupIntegrationTarget,
+} from './setup';
 import { archiveResolvedComments } from './archive';
 import { CommentStatusFilter, groupCommentsByFile } from './tree-data';
 
@@ -224,6 +230,10 @@ class FeedbackLoopController {
     this.setupStoreWatcher();
     this.loadAllThreads();
     this.setupDocumentReconciliation();
+
+    if (this.context.extensionMode !== vscode.ExtensionMode.Test) {
+      void this.maybePromptForSetup();
+    }
   }
 
   private getProjectRoot(): string {
@@ -295,12 +305,12 @@ class FeedbackLoopController {
       )
     );
 
-    // Setup Agent Integration (Phase 4 stub — just ensures .feedback/ exists)
+    // Setup Agent Integration
     this.disposables.push(
       vscode.commands.registerCommand(
         'feedback-loop.setupAgentIntegration',
         () => {
-          this.handleSetupAgentIntegration();
+          void this.handleSetupAgentIntegration();
         }
       )
     );
@@ -564,26 +574,191 @@ class FeedbackLoopController {
     }
   }
 
-  private handleSetupAgentIntegration(): void {
+  private async maybePromptForSetup(): Promise<void> {
+    const promptStateKey = 'feedback-loop.setupPromptShown';
+    const storeExists = fs.existsSync(path.join(this.projectRoot, '.feedback', 'store.json'));
+    if (storeExists) {
+      return;
+    }
+    if (this.context.workspaceState.get<boolean>(promptStateKey)) {
+      return;
+    }
+
+    await this.context.workspaceState.update(promptStateKey, true);
+
+    const selected = await vscode.window.showInformationMessage(
+      'Feedback Loop is installed for this workspace. Run setup to initialize .feedback and optional agent integrations.',
+      'Set Up Now',
+      'Later'
+    );
+    if (selected === 'Set Up Now') {
+      await this.handleSetupAgentIntegration();
+    }
+  }
+
+  private async promptForGitignoreChoice(): Promise<boolean | undefined> {
+    const options: Array<{ label: string; detail: string; value: boolean }> = [
+      {
+        label: 'Add .feedback/ to .gitignore',
+        detail: 'Recommended when .feedback is inside the repository.',
+        value: true,
+      },
+      {
+        label: 'Leave .gitignore unchanged',
+        detail: 'Use this if you want to manage ignore rules manually.',
+        value: false,
+      },
+    ];
+
+    const selected = await vscode.window.showQuickPick(options, {
+      placeHolder: 'Choose whether setup should update .gitignore',
+      ignoreFocusOut: true,
+    });
+    return selected?.value;
+  }
+
+  private async promptForIntegrationTargets(
+    detectedTargets: SetupIntegrationTarget[]
+  ): Promise<SetupIntegrationTarget[] | undefined> {
+    type IntegrationMode = 'detected' | 'manual' | 'skip';
+    const modeOptions: Array<{ label: string; detail: string; value: IntegrationMode }> = [];
+
+    if (detectedTargets.length > 0) {
+      const detectedLabel = detectedTargets
+        .map((target) =>
+          target === 'claude'
+            ? 'Claude'
+            : target === 'opencode'
+              ? 'OpenCode'
+              : 'Codex'
+        )
+        .join(', ');
+      modeOptions.push({
+        label: 'Install detected integrations',
+        detail: `Detected targets: ${detectedLabel}`,
+        value: 'detected',
+      });
+    }
+
+    modeOptions.push({
+      label: 'Choose integrations manually',
+      detail: 'Pick exactly which integrations to write now.',
+      value: 'manual',
+    });
+    modeOptions.push({
+      label: 'Skip integration install for now',
+      detail: 'You can rerun setup later to add integrations.',
+      value: 'skip',
+    });
+
+    const selectedMode = await vscode.window.showQuickPick(modeOptions, {
+      placeHolder: 'Choose agent integration setup behavior',
+      ignoreFocusOut: true,
+    });
+    if (!selectedMode) {
+      return undefined;
+    }
+    if (selectedMode.value === 'skip') {
+      return [];
+    }
+    if (selectedMode.value === 'detected') {
+      return detectedTargets;
+    }
+
+    const manualOptions: Array<{
+      label: string;
+      description: string;
+      value: SetupIntegrationTarget;
+    }> = [
+      {
+        label: 'Claude Code',
+        description: detectedTargets.includes('claude') ? 'Detected' : 'Not detected',
+        value: 'claude',
+      },
+      {
+        label: 'OpenCode',
+        description: detectedTargets.includes('opencode') ? 'Detected' : 'Not detected',
+        value: 'opencode',
+      },
+      {
+        label: 'Codex (AGENTS.md section)',
+        description: detectedTargets.includes('codex') ? 'Detected' : 'Not detected',
+        value: 'codex',
+      },
+    ];
+
+    const selectedTargets = await vscode.window.showQuickPick(manualOptions, {
+      canPickMany: true,
+      placeHolder: 'Select integrations to install now',
+      ignoreFocusOut: true,
+    });
+    if (selectedTargets === undefined) {
+      return undefined;
+    }
+    return selectedTargets.map((target) => target.value);
+  }
+
+  private formatIntegrationTargets(targets: SetupIntegrationTarget[]): string {
+    return targets
+      .map((target) =>
+        target === 'claude'
+          ? 'Claude'
+          : target === 'opencode'
+            ? 'OpenCode'
+            : 'Codex'
+      )
+      .join(', ');
+  }
+
+  private async handleSetupAgentIntegration(): Promise<void> {
     try {
+      const addGitignoreEntry = await this.promptForGitignoreChoice();
+      if (addGitignoreEntry === undefined) {
+        return;
+      }
+
+      const detection = detectAgentIntegrations(this.projectRoot);
+      const integrationTargets = await this.promptForIntegrationTargets(
+        getDetectedIntegrationTargets(detection)
+      );
+      if (integrationTargets === undefined) {
+        return;
+      }
+
       const result = runSetupAgentIntegration(this.projectRoot, {
         cliSourceDir: path.resolve(this.context.extensionPath, '..', 'cli'),
+        addGitignoreEntry,
+        integrationTargets,
       });
 
       const summary: string[] = [];
       summary.push('.feedback scaffolding ready');
       summary.push('CLI deployed to .feedback/bin');
-      if (result.gitignoreUpdated) {
+      if (result.gitignoreSkipped) {
+        summary.push('.gitignore unchanged');
+      } else if (result.gitignoreUpdated) {
         summary.push('.gitignore updated');
+      } else {
+        summary.push('.gitignore already configured');
       }
-      if (result.skillsWritten.length > 0) {
-        summary.push(`skills written (${result.skillsWritten.length})`);
-      }
-      if (result.codexSectionUpdated) {
-        summary.push('AGENTS.md updated');
-      }
-      if (result.usedFallbackToAllAgents) {
-        summary.push('no existing agent config detected; installed all integrations');
+
+      if (result.integrationTargetsRequested.length === 0) {
+        summary.push('agent integrations skipped');
+      } else {
+        summary.push(
+          `integrations requested: ${this.formatIntegrationTargets(
+            result.integrationTargetsRequested
+          )}`
+        );
+        if (result.skillsWritten.length > 0) {
+          summary.push(`skills written (${result.skillsWritten.length})`);
+        }
+        if (result.codexSectionUpdated) {
+          summary.push('AGENTS.md updated');
+        }
+        if (result.skillsWritten.length === 0 && !result.codexSectionUpdated) {
+          summary.push('selected integrations already up to date');
+        }
       }
 
       vscode.window.showInformationMessage(

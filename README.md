@@ -29,6 +29,19 @@ Three components share a single JSON store via the filesystem. The extension wri
 
 Under active development. See `docs/spec.md` for the full technical specification and `docs/progress.md` for current build status.
 
+## Quick Start (Current)
+
+1. Open a workspace in VS Code with the Feedback Loop extension active.
+2. Run **Feedback: Setup Agent Integration** from the Command Palette.
+3. In setup, choose:
+   - whether to add `.feedback/` to `.gitignore`,
+   - whether to install integrations now (detected/manual/skip).
+4. Start leaving inline feedback in files (gutter `+`), then use `.feedback/bin/feedback-cli` for agent-side replies.
+
+Notes:
+- Feedback data stays in fixed project-local path: `.feedback/`.
+- Agent integrations are explicit opt-in during setup.
+
 ## Documentation
 
 - **`docs/spec.md`** — Complete technical specification: problem statement, architecture, data model, anchoring algorithm, agent integration, build phases.

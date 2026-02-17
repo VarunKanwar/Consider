@@ -232,7 +232,9 @@ The extension should register the following commands:
 
 **Feedback: Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with status `open`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
 
-**Feedback: Setup Agent Integration** — Scaffolds the `.feedback/` directory, adds it to `.gitignore`, copies the CLI tool, and drops skill files into the appropriate locations for detected agent systems. See Section 8.
+**Feedback: Setup Agent Integration** — Runs a guided setup flow: initializes `.feedback/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
+
+On first run in a workspace without `.feedback/store.json`, the extension should surface a lightweight setup prompt so onboarding is discoverable without forcing side effects.
 
 **Feedback: Show All Comments** — Opens a tree view / panel showing all feedback across the project, grouped by file, filterable by status (open/resolved/stale/orphaned).
 
@@ -374,7 +376,7 @@ Comment threads are *not* part of the main conversation history. They exist in t
 
 ### 8.1 Skill Files
 
-The "Setup Agent Integration" command drops skill files into the project. Each skill file explains the feedback system to the agent: what the CLI commands are, what the conventions are, and how to use them.
+The "Setup Agent Integration" command can write skill files into the project when the developer explicitly opts in. Each skill file explains the feedback system to the agent: what the CLI commands are, what the conventions are, and how to use them.
 
 **For Claude Code:** `.claude/skills/feedback-loop/SKILL.md`
 

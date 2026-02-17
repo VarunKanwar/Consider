@@ -16,7 +16,11 @@ export interface AgentDetection {
 
 export interface SetupOptions {
   cliSourceDir: string;
+  addGitignoreEntry?: boolean;
+  integrationTargets?: SetupIntegrationTarget[];
 }
+
+export type SetupIntegrationTarget = 'claude' | 'opencode' | 'codex';
 
 export interface SetupResult {
   feedbackDirCreated: boolean;
@@ -24,10 +28,11 @@ export interface SetupResult {
   storeCreated: boolean;
   cliCopied: string[];
   gitignoreUpdated: boolean;
+  gitignoreSkipped: boolean;
   skillsWritten: string[];
   codexSectionUpdated: boolean;
   detection: AgentDetection;
-  usedFallbackToAllAgents: boolean;
+  integrationTargetsRequested: SetupIntegrationTarget[];
 }
 
 function ensureDirectory(dirPath: string): boolean {
@@ -68,12 +73,22 @@ function ensureGitignoreEntry(projectRoot: string): boolean {
   return true;
 }
 
-function detectAgents(projectRoot: string): AgentDetection {
+export function detectAgentIntegrations(projectRoot: string): AgentDetection {
   const claudeDirExists = fs.existsSync(path.join(projectRoot, '.claude'));
   const openCodeDirExists = fs.existsSync(path.join(projectRoot, '.opencode'));
   const agentsMdExists = fs.existsSync(path.join(projectRoot, 'AGENTS.md'));
   const noneDetected = !claudeDirExists && !openCodeDirExists && !agentsMdExists;
   return { claudeDirExists, openCodeDirExists, agentsMdExists, noneDetected };
+}
+
+export function getDetectedIntegrationTargets(
+  detection: AgentDetection
+): SetupIntegrationTarget[] {
+  const targets: SetupIntegrationTarget[] = [];
+  if (detection.claudeDirExists) targets.push('claude');
+  if (detection.openCodeDirExists) targets.push('opencode');
+  if (detection.agentsMdExists) targets.push('codex');
+  return targets;
 }
 
 function buildSkillMarkdown(agentName: string): string {
@@ -192,6 +207,24 @@ function copyCli(cliSourceDir: string, destinationBinDir: string): string[] {
   return copied;
 }
 
+function normalizeIntegrationTargets(
+  targets: SetupIntegrationTarget[] | undefined
+): SetupIntegrationTarget[] {
+  const allowed: SetupIntegrationTarget[] = ['claude', 'opencode', 'codex'];
+  const seen = new Set<SetupIntegrationTarget>();
+  const normalized: SetupIntegrationTarget[] = [];
+
+  for (const target of targets || []) {
+    if (!allowed.includes(target) || seen.has(target)) {
+      continue;
+    }
+    seen.add(target);
+    normalized.push(target);
+  }
+
+  return normalized;
+}
+
 export function runSetupAgentIntegration(
   projectRoot: string,
   options: SetupOptions
@@ -208,30 +241,34 @@ export function runSetupAgentIntegration(
   }
 
   const cliCopied = copyCli(options.cliSourceDir, binDir);
-  const gitignoreUpdated = ensureGitignoreEntry(projectRoot);
+  const addGitignoreEntry = options.addGitignoreEntry ?? true;
+  const gitignoreUpdated = addGitignoreEntry
+    ? ensureGitignoreEntry(projectRoot)
+    : false;
+  const gitignoreSkipped = !addGitignoreEntry;
 
-  const detection = detectAgents(projectRoot);
-  const usedFallbackToAllAgents = detection.noneDetected;
-  const configureClaude = detection.claudeDirExists || detection.noneDetected;
-  const configureOpenCode = detection.openCodeDirExists || detection.noneDetected;
-  const configureCodex = detection.agentsMdExists || detection.noneDetected;
+  const detection = detectAgentIntegrations(projectRoot);
+  const integrationTargetsRequested = normalizeIntegrationTargets(
+    options.integrationTargets
+  );
+  const targetSet = new Set<SetupIntegrationTarget>(integrationTargetsRequested);
 
   const skillsWritten: string[] = [];
   let codexSectionUpdated = false;
 
-  if (configureClaude) {
+  if (targetSet.has('claude')) {
     skillsWritten.push(
       writeSkillFile(projectRoot, CLAUDE_SKILL_PATH, 'Claude Code')
     );
   }
 
-  if (configureOpenCode) {
+  if (targetSet.has('opencode')) {
     skillsWritten.push(
       writeSkillFile(projectRoot, OPENCODE_SKILL_PATH, 'OpenCode')
     );
   }
 
-  if (configureCodex) {
+  if (targetSet.has('codex')) {
     codexSectionUpdated = upsertCodexSection(projectRoot);
   }
 
@@ -241,10 +278,10 @@ export function runSetupAgentIntegration(
     storeCreated,
     cliCopied,
     gitignoreUpdated,
+    gitignoreSkipped,
     skillsWritten,
     codexSectionUpdated,
     detection,
-    usedFallbackToAllAgents,
+    integrationTargetsRequested,
   };
 }
-

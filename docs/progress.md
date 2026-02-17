@@ -371,18 +371,61 @@
 
 ---
 
-## Phase 7: Onboarding and Installation UX (Planned)
+## Phase 7: Onboarding and Installation UX
 
-**Status:** Planned
+**Status:** Complete
 
-### Planned scope
+### What was built
 
-1. Add extension-first guided setup flow for first-time users.
-2. Keep feedback store location fixed at `<project-root>/.feedback/` for v1.
-3. Make agent integration writes (skills / AGENTS section) explicit opt-in, not implicit.
-4. Improve setup discoverability with clear prompts and post-setup summary.
+1. **Setup core made explicit-opt-in for integrations** (`extension/src/setup.ts`)
+   - Added setup options for:
+     - optional `.gitignore` update (`addGitignoreEntry`),
+     - explicit integration targets (`integrationTargets`).
+   - Removed implicit fallback behavior that auto-installed all integrations when no agent footprint was detected.
+   - Added exported detection helpers for guided setup defaults:
+     - `detectAgentIntegrations(projectRoot)`
+     - `getDetectedIntegrationTargets(detection)`
+   - Setup still keeps feedback data rooted at fixed `<project-root>/.feedback/`.
 
-### Planned validation
+2. **Guided setup UX in extension command path** (`extension/src/extension.ts`)
+   - `Feedback: Setup Agent Integration` is now a guided flow:
+     - asks whether to update `.gitignore`,
+     - asks integration behavior (install detected, choose manually, or skip),
+     - writes only explicitly selected integrations.
+   - Setup completion message now reports selected/updated/skipped actions clearly.
 
-1. Automated tests for setup decision paths and idempotency.
-2. Manual tests for first-run discoverability and consent UX.
+3. **First-run discoverability prompt** (`extension/src/extension.ts`)
+   - On workspace activation without `.feedback/store.json`, extension shows a one-time prompt:
+     - `Set Up Now`
+     - `Later`
+   - Prompt is suppressed in extension test mode to avoid host-test flakiness.
+
+4. **Phase 7 automated tests** (`test/extension/setup.test.ts`)
+   - Added/updated tests for:
+     - baseline setup without integration writes by default,
+     - explicit target installation behavior,
+     - optional `.gitignore` update skip path,
+     - idempotency with explicit targets,
+     - integration footprint detection helpers.
+
+5. **Manual testing guide updates** (`docs/manual-testing.md`)
+   - Added first-run prompt expectations.
+   - Updated setup test flow for guided choices and explicit consent behavior.
+   - Updated setup idempotency test to reflect explicit target selection.
+
+### What was tested
+
+1. `npm test` (full fast suite) after Phase 7 changes.
+2. Updated extension setup tests in `test/extension/setup.test.ts`.
+3. Manual test procedures updated for guided setup and first-run prompt behavior.
+
+### Implementation decisions not in the spec
+
+1. **Setup prompt cadence:** first-run prompt is shown once per workspace state when `.feedback/store.json` is missing.
+2. **Guided defaults:** users can skip integrations explicitly; no implicit integration writes occur.
+3. **No custom store path in v1:** `.feedback/` remains fixed at project root for compatibility with existing CLI/store assumptions.
+
+### What's known to be incomplete
+
+1. **Global skill install path remains out of scope for v1:** setup currently writes project-local integrations only.
+2. **Onboarding wizard remains command/prompt based:** no custom webview wizard has been added.

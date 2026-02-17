@@ -12,20 +12,25 @@
 2. Press **F5** (or Run > Start Debugging). Select "Run Extension" if prompted.
 3. A new VS Code window (Extension Development Host) should open.
 4. **Expected:** No errors in the Debug Console. The extension is active immediately on startup (no command needed first).
+5. If the workspace does not yet have `.feedback/store.json`, **Expected:** a one-time setup prompt appears with actions like **Set Up Now** / **Later**.
 
 ## Test 2: Setup Agent Integration
 
 1. In the Extension Development Host window, open any project folder.
 2. Open the Command Palette (Cmd+Shift+P / Ctrl+Shift+P).
 3. Run **Feedback: Setup Agent Integration**.
+4. In the guided flow:
+   - choose whether to add `.feedback/` to `.gitignore`,
+   - choose integration behavior: install detected, choose manually, or skip.
 4. **Expected:**
    - `.feedback/store.json` exists.
    - `.feedback/bin/feedback-cli` and `.feedback/bin/feedback-cli.js` exist.
-   - `.gitignore` contains `.feedback/` exactly once.
-   - If `.claude/` exists, `.claude/skills/feedback-loop/SKILL.md` is written.
-   - If `.opencode/` exists, `.opencode/skills/feedback-loop/SKILL.md` is written.
-   - If `AGENTS.md` exists, a Feedback Loop section is appended/updated.
-   - If none of those agent configs exist, setup creates all three integrations.
+   - If `.gitignore` update was selected, `.gitignore` contains `.feedback/` exactly once.
+   - If integration install was skipped, no new skill files / AGENTS section are written.
+   - If integrations were selected, only selected targets are written/updated:
+     - Claude: `.claude/skills/feedback-loop/SKILL.md`
+     - OpenCode: `.opencode/skills/feedback-loop/SKILL.md`
+     - Codex: upserted Feedback Loop section in `AGENTS.md`
 
 ## Test 3: Add a Comment
 
@@ -140,11 +145,13 @@ This is the key test for the file watcher.
 
 ## Test 14: Setup Idempotency
 
-1. Run **Feedback: Setup Agent Integration** twice.
+1. Run **Feedback: Setup Agent Integration** twice with:
+   - `.gitignore` update enabled,
+   - Codex integration selected.
 2. **Expected:**
    - No duplicate `.feedback/` entries in `.gitignore`.
    - No duplicate Feedback Loop section in `AGENTS.md`.
-   - Existing skill files are refreshed, not duplicated with extra copies.
+   - Existing integration files are refreshed, not duplicated with extra copies.
 
 ## Test 15: No Workspace Folder
 
