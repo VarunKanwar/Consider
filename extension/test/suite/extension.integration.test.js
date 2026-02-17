@@ -53,6 +53,7 @@ suite('Feedback Loop Extension Host', () => {
     await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
 
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
+    assert.ok(fs.existsSync(path.join(root, '.feedback', 'config.json')));
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli')));
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli.js')));
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli.cjs')));

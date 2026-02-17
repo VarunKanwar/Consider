@@ -10,6 +10,7 @@ const {
   detectAgentIntegrations,
   getDetectedIntegrationTargets,
   runSetupAgentIntegration,
+  runUninstallAgentIntegration,
 } = require(path.join(ROOT, 'extension', 'out', 'setup.js'));
 
 function makeTmpProject() {
@@ -77,6 +78,10 @@ function assertHasSkillFrontmatter(skillContent) {
   assert.ok(skillContent.includes('\n---\n\n# Feedback Loop\n'));
 }
 
+function readJson(relativePath, projectRoot) {
+  return JSON.parse(read(relativePath, projectRoot));
+}
+
 describe('setup agent integration', () => {
   let projectRoot;
   let cliSourceDir;
@@ -110,6 +115,7 @@ describe('setup agent integration', () => {
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'store.js')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'reconcile.js')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'package.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'config.json')));
     assert.ok(
       fs
         .readFileSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli'), 'utf-8')
@@ -242,6 +248,40 @@ describe('setup agent integration', () => {
     );
   });
 
+  it('tracks installed skill locations in .feedback/config.json', () => {
+    const controlledHome = path.join(projectRoot, 'fake-home');
+    fs.mkdirSync(controlledHome, { recursive: true });
+
+    runSetupAgentIntegration(projectRoot, {
+      cliSourceDir,
+      integrationInstalls: [
+        { target: 'claude', scope: 'project' },
+        { target: 'codex', scope: 'home' },
+      ],
+      homeDir: controlledHome,
+    });
+
+    const config = readJson('.feedback/config.json', projectRoot);
+    assert.equal(config.version, 1);
+    assert.ok(Array.isArray(config.trackedSkillInstalls));
+    assert.ok(
+      config.trackedSkillInstalls.some(
+        (entry) =>
+          entry.target === 'claude' &&
+          entry.scope === 'project' &&
+          entry.path.endsWith(path.join('.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+      )
+    );
+    assert.ok(
+      config.trackedSkillInstalls.some(
+        (entry) =>
+          entry.target === 'codex' &&
+          entry.scope === 'home' &&
+          entry.path.endsWith(path.join('.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+      )
+    );
+  });
+
   it('deploys a runnable CLI in package type=module projects', () => {
     const realCliSourceDir = path.join(ROOT, 'cli');
     writeFile(projectRoot, 'package.json', '{"type":"module"}\n');
@@ -287,6 +327,88 @@ describe('setup agent integration', () => {
     const codexSkill = read('.codex/skills/feedback-loop/SKILL.md', projectRoot);
     assertHasSkillFrontmatter(codexSkill);
     assert.equal(countOccurrences(codexSkill, '\nname: feedback-loop\n'), 1);
+  });
+
+  it('uninstalls tracked skills, removes gitignore entry, and deletes .feedback by default', () => {
+    const controlledHome = path.join(projectRoot, 'fake-home');
+    fs.mkdirSync(controlledHome, { recursive: true });
+
+    runSetupAgentIntegration(projectRoot, {
+      cliSourceDir,
+      integrationInstalls: [
+        { target: 'claude', scope: 'project' },
+        { target: 'opencode', scope: 'home' },
+      ],
+      homeDir: controlledHome,
+    });
+
+    const result = runUninstallAgentIntegration(projectRoot, {
+      homeDir: controlledHome,
+      removeFeedbackDir: true,
+      removeGitignoreEntry: true,
+    });
+
+    assert.equal(result.configFound, true);
+    assert.equal(result.feedbackDirRemoved, true);
+    assert.equal(result.gitignoreUpdated, true);
+    assert.equal(result.skillsRemoved.length, 2);
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.feedback')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop')));
+    assert.ok(!fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop')));
+    assert.equal(read('.gitignore', projectRoot).includes('.feedback/'), false);
+  });
+
+  it('supports skills-only uninstall and preserves .feedback data', () => {
+    runSetupAgentIntegration(projectRoot, {
+      cliSourceDir,
+      integrationTargets: ['codex'],
+    });
+
+    const result = runUninstallAgentIntegration(projectRoot, {
+      removeFeedbackDir: false,
+      removeGitignoreEntry: false,
+    });
+
+    assert.equal(result.feedbackDirRemoved, false);
+    assert.equal(result.gitignoreSkipped, true);
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'store.json')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop')));
+    const config = readJson('.feedback/config.json', projectRoot);
+    assert.deepEqual(config.trackedSkillInstalls, []);
+  });
+
+  it('falls back to skill discovery when config is missing', () => {
+    const codexSkillPath = path.join(
+      projectRoot,
+      '.codex',
+      'skills',
+      'feedback-loop',
+      'SKILL.md'
+    );
+    writeFile(
+      projectRoot,
+      path.join('.codex', 'skills', 'feedback-loop', 'SKILL.md'),
+      [
+        '---',
+        'name: feedback-loop',
+        'description: feedback test',
+        '---',
+        '',
+        '# Feedback Loop',
+        '',
+      ].join('\n')
+    );
+
+    const result = runUninstallAgentIntegration(projectRoot, {
+      removeFeedbackDir: false,
+      removeGitignoreEntry: false,
+    });
+
+    assert.equal(result.configFound, false);
+    assert.equal(result.fallbackDetectionUsed, true);
+    assert.equal(result.skillsRemoved.length, 1);
+    assert.equal(result.skillsRemoved[0], path.normalize(codexSkillPath));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop')));
   });
 
   it('detects existing integration footprints for guided setup defaults', () => {

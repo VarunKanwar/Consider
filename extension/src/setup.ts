@@ -6,7 +6,9 @@ import { emptyStore, storePath, writeStore } from './store';
 const CLAUDE_SKILL_PATH = ['.claude', 'skills', 'feedback-loop', 'SKILL.md'];
 const OPENCODE_SKILL_PATH = ['.opencode', 'skills', 'feedback-loop', 'SKILL.md'];
 const CODEX_SKILL_PATH = ['.codex', 'skills', 'feedback-loop', 'SKILL.md'];
+const CODEX_LEGACY_SKILL_PATH = ['.agents', 'skills', 'feedback-loop', 'SKILL.md'];
 const SKILL_NAME = 'feedback-loop';
+const SETUP_CONFIG_VERSION = 1;
 
 const SKILL_DESCRIPTIONS: Record<SetupIntegrationTarget, string> = {
   claude:
@@ -50,6 +52,10 @@ export interface SetupIntegrationInstall {
   scope: SetupIntegrationScope;
 }
 
+export interface SetupTrackedSkillInstall extends SetupIntegrationInstall {
+  path: string;
+}
+
 export interface SetupResult {
   feedbackDirCreated: boolean;
   binDirCreated: boolean;
@@ -61,6 +67,31 @@ export interface SetupResult {
   detection: AgentDetection;
   integrationTargetsRequested: SetupIntegrationTarget[];
   integrationInstallsRequested: SetupIntegrationInstall[];
+  trackedSkillInstalls: SetupTrackedSkillInstall[];
+}
+
+export interface UninstallOptions {
+  removeFeedbackDir?: boolean;
+  removeGitignoreEntry?: boolean;
+  homeDir?: string;
+}
+
+export interface UninstallResult {
+  configFound: boolean;
+  fallbackDetectionUsed: boolean;
+  trackedSkillInstalls: SetupTrackedSkillInstall[];
+  skillsRemoved: string[];
+  skillsMissing: string[];
+  feedbackDirRemoved: boolean;
+  feedbackDirAbsent: boolean;
+  gitignoreUpdated: boolean;
+  gitignoreSkipped: boolean;
+}
+
+interface SetupConfigFile {
+  version: number;
+  trackedSkillInstalls: SetupTrackedSkillInstall[];
+  lastUpdatedAt: string;
 }
 
 function ensureDirectory(dirPath: string): boolean {
@@ -77,6 +108,106 @@ function normalizeNewline(content: string): string {
 
 function trimTrailingBlankLines(content: string): string {
   return content.replace(/\n+$/g, '');
+}
+
+function configPath(projectRoot: string): string {
+  return path.join(projectRoot, '.feedback', 'config.json');
+}
+
+function emptySetupConfig(): SetupConfigFile {
+  return {
+    version: SETUP_CONFIG_VERSION,
+    trackedSkillInstalls: [],
+    lastUpdatedAt: new Date().toISOString(),
+  };
+}
+
+function isSetupIntegrationTarget(value: unknown): value is SetupIntegrationTarget {
+  return value === 'claude' || value === 'opencode' || value === 'codex';
+}
+
+function isSetupIntegrationScope(value: unknown): value is SetupIntegrationScope {
+  return value === 'project' || value === 'home';
+}
+
+function normalizeTrackedSkillInstalls(
+  installs: SetupTrackedSkillInstall[] | undefined
+): SetupTrackedSkillInstall[] {
+  const normalized: SetupTrackedSkillInstall[] = [];
+  const seen = new Set<string>();
+
+  for (const install of installs || []) {
+    if (
+      !install ||
+      !isSetupIntegrationTarget(install.target) ||
+      !isSetupIntegrationScope(install.scope) ||
+      typeof install.path !== 'string' ||
+      install.path.trim().length === 0
+    ) {
+      continue;
+    }
+
+    const normalizedPath = path.normalize(install.path);
+    const key = `${install.target}:${install.scope}:${normalizedPath}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    normalized.push({
+      target: install.target,
+      scope: install.scope,
+      path: normalizedPath,
+    });
+  }
+
+  return normalized;
+}
+
+function readSetupConfig(projectRoot: string): SetupConfigFile {
+  const p = configPath(projectRoot);
+  if (!fs.existsSync(p)) {
+    return emptySetupConfig();
+  }
+
+  try {
+    const raw = fs.readFileSync(p, 'utf-8');
+    const data = JSON.parse(raw) as Partial<SetupConfigFile>;
+    if (data.version !== SETUP_CONFIG_VERSION) {
+      return emptySetupConfig();
+    }
+    return {
+      version: SETUP_CONFIG_VERSION,
+      trackedSkillInstalls: normalizeTrackedSkillInstalls(data.trackedSkillInstalls),
+      lastUpdatedAt: typeof data.lastUpdatedAt === 'string'
+        ? data.lastUpdatedAt
+        : new Date().toISOString(),
+    };
+  } catch {
+    return emptySetupConfig();
+  }
+}
+
+function writeSetupConfig(projectRoot: string, config: SetupConfigFile): void {
+  const p = configPath(projectRoot);
+  const dir = path.dirname(p);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const payload: SetupConfigFile = {
+    version: SETUP_CONFIG_VERSION,
+    trackedSkillInstalls: normalizeTrackedSkillInstalls(config.trackedSkillInstalls),
+    lastUpdatedAt: config.lastUpdatedAt || new Date().toISOString(),
+  };
+  const tmp = `${p}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(payload, null, 2) + '\n', 'utf-8');
+  fs.renameSync(tmp, p);
+}
+
+function mergeTrackedSkillInstalls(
+  existing: SetupTrackedSkillInstall[],
+  next: SetupTrackedSkillInstall[]
+): SetupTrackedSkillInstall[] {
+  return normalizeTrackedSkillInstalls([...existing, ...next]);
 }
 
 function ensureGitignoreEntry(projectRoot: string): boolean {
@@ -98,6 +229,29 @@ function ensureGitignoreEntry(projectRoot: string): boolean {
   const next = trimTrailingBlankLines(existing);
   const separator = next.length > 0 ? '\n' : '';
   fs.writeFileSync(gitignorePath, `${next}${separator}.feedback/\n`, 'utf-8');
+  return true;
+}
+
+function removeGitignoreEntry(projectRoot: string): boolean {
+  const gitignorePath = path.join(projectRoot, '.gitignore');
+  if (!fs.existsSync(gitignorePath)) {
+    return false;
+  }
+
+  const existing = normalizeNewline(fs.readFileSync(gitignorePath, 'utf-8'));
+  const lines = existing.length > 0 ? existing.split('\n') : [];
+  const filtered = lines.filter((line) => {
+    const trimmed = line.trim();
+    return trimmed !== '.feedback/' && trimmed !== '.feedback';
+  });
+
+  if (filtered.length === lines.length) {
+    return false;
+  }
+
+  const next = trimTrailingBlankLines(filtered.join('\n'));
+  const final = next.length > 0 ? `${next}\n` : '';
+  fs.writeFileSync(gitignorePath, final, 'utf-8');
   return true;
 }
 
@@ -154,6 +308,80 @@ export function getDetectedIntegrationTargets(
     targets.push('codex');
   }
   return targets;
+}
+
+function knownSkillInstallCandidates(
+  projectRoot: string,
+  homeDir: string
+): SetupTrackedSkillInstall[] {
+  return [
+    {
+      target: 'claude',
+      scope: 'project',
+      path: path.join(projectRoot, ...CLAUDE_SKILL_PATH),
+    },
+    {
+      target: 'claude',
+      scope: 'home',
+      path: path.join(homeDir, ...CLAUDE_SKILL_PATH),
+    },
+    {
+      target: 'opencode',
+      scope: 'project',
+      path: path.join(projectRoot, ...OPENCODE_SKILL_PATH),
+    },
+    {
+      target: 'opencode',
+      scope: 'home',
+      path: path.join(homeDir, ...OPENCODE_SKILL_PATH),
+    },
+    {
+      target: 'codex',
+      scope: 'project',
+      path: path.join(projectRoot, ...CODEX_SKILL_PATH),
+    },
+    {
+      target: 'codex',
+      scope: 'home',
+      path: path.join(homeDir, ...CODEX_SKILL_PATH),
+    },
+    // Legacy Codex location support for uninstall fallback.
+    {
+      target: 'codex',
+      scope: 'project',
+      path: path.join(projectRoot, ...CODEX_LEGACY_SKILL_PATH),
+    },
+    {
+      target: 'codex',
+      scope: 'home',
+      path: path.join(homeDir, ...CODEX_LEGACY_SKILL_PATH),
+    },
+  ];
+}
+
+function looksLikeFeedbackLoopSkill(skillPath: string): boolean {
+  if (!fs.existsSync(skillPath)) {
+    return false;
+  }
+  try {
+    const raw = fs.readFileSync(skillPath, 'utf-8');
+    return raw.includes('\nname: feedback-loop\n') && raw.includes('# Feedback Loop');
+  } catch {
+    return false;
+  }
+}
+
+function detectInstalledSkillsFallback(
+  projectRoot: string,
+  homeDir: string
+): SetupTrackedSkillInstall[] {
+  const detected: SetupTrackedSkillInstall[] = [];
+  for (const install of knownSkillInstallCandidates(projectRoot, homeDir)) {
+    if (looksLikeFeedbackLoopSkill(install.path)) {
+      detected.push(install);
+    }
+  }
+  return normalizeTrackedSkillInstalls(detected);
 }
 
 function buildSkillMarkdown(target: SetupIntegrationTarget): string {
@@ -277,6 +505,37 @@ function copyCli(
   return copied;
 }
 
+function removeDirIfEmpty(dirPath: string): boolean {
+  if (!fs.existsSync(dirPath)) {
+    return false;
+  }
+  const stat = fs.statSync(dirPath);
+  if (!stat.isDirectory()) {
+    return false;
+  }
+  if (fs.readdirSync(dirPath).length > 0) {
+    return false;
+  }
+  fs.rmdirSync(dirPath);
+  return true;
+}
+
+function removeTrackedSkillInstall(install: SetupTrackedSkillInstall): boolean {
+  const skillPath = path.normalize(install.path);
+  if (!fs.existsSync(skillPath)) {
+    return false;
+  }
+
+  const skillDir = path.dirname(skillPath);
+  fs.rmSync(skillDir, { recursive: true, force: true });
+
+  const skillsDir = path.dirname(skillDir);
+  const agentRootDir = path.dirname(skillsDir);
+  removeDirIfEmpty(skillsDir);
+  removeDirIfEmpty(agentRootDir);
+  return true;
+}
+
 function normalizeIntegrationTargets(
   targets: SetupIntegrationTarget[] | undefined
 ): SetupIntegrationTarget[] {
@@ -358,6 +617,7 @@ export function runSetupAgentIntegration(
   );
 
   const skillsWritten: string[] = [];
+  const trackedSkillInstallsWritten: SetupTrackedSkillInstall[] = [];
 
   for (const install of integrationInstallsRequested) {
     const skillBaseDir = install.scope === 'home'
@@ -365,23 +625,46 @@ export function runSetupAgentIntegration(
       : projectRoot;
 
     if (install.target === 'claude') {
-      skillsWritten.push(
-        writeSkillFile(skillBaseDir, CLAUDE_SKILL_PATH, 'claude')
-      );
+      const skillPath = writeSkillFile(skillBaseDir, CLAUDE_SKILL_PATH, 'claude');
+      skillsWritten.push(skillPath);
+      trackedSkillInstallsWritten.push({
+        target: 'claude',
+        scope: install.scope,
+        path: skillPath,
+      });
       continue;
     }
     if (install.target === 'opencode') {
-      skillsWritten.push(
-        writeSkillFile(skillBaseDir, OPENCODE_SKILL_PATH, 'opencode')
-      );
+      const skillPath = writeSkillFile(skillBaseDir, OPENCODE_SKILL_PATH, 'opencode');
+      skillsWritten.push(skillPath);
+      trackedSkillInstallsWritten.push({
+        target: 'opencode',
+        scope: install.scope,
+        path: skillPath,
+      });
       continue;
     }
     if (install.target === 'codex') {
-      skillsWritten.push(
-        writeSkillFile(skillBaseDir, CODEX_SKILL_PATH, 'codex')
-      );
+      const skillPath = writeSkillFile(skillBaseDir, CODEX_SKILL_PATH, 'codex');
+      skillsWritten.push(skillPath);
+      trackedSkillInstallsWritten.push({
+        target: 'codex',
+        scope: install.scope,
+        path: skillPath,
+      });
     }
   }
+
+  const setupConfig = readSetupConfig(projectRoot);
+  const trackedSkillInstalls = mergeTrackedSkillInstalls(
+    setupConfig.trackedSkillInstalls,
+    trackedSkillInstallsWritten
+  );
+  writeSetupConfig(projectRoot, {
+    version: SETUP_CONFIG_VERSION,
+    trackedSkillInstalls,
+    lastUpdatedAt: new Date().toISOString(),
+  });
 
   return {
     feedbackDirCreated,
@@ -394,5 +677,78 @@ export function runSetupAgentIntegration(
     detection,
     integrationTargetsRequested,
     integrationInstallsRequested,
+    trackedSkillInstalls,
+  };
+}
+
+export function runUninstallAgentIntegration(
+  projectRoot: string,
+  options: UninstallOptions = {}
+): UninstallResult {
+  const homeDir = options.homeDir ?? os.homedir();
+  const removeFeedbackDir = options.removeFeedbackDir ?? true;
+  const shouldRemoveGitignoreEntry = options.removeGitignoreEntry ?? true;
+
+  const feedbackDir = path.join(projectRoot, '.feedback');
+  const feedbackDirExists = fs.existsSync(feedbackDir);
+  const configFilePath = configPath(projectRoot);
+  const configFound = fs.existsSync(configFilePath);
+
+  const setupConfig = readSetupConfig(projectRoot);
+  let trackedSkillInstalls = setupConfig.trackedSkillInstalls;
+  let fallbackDetectionUsed = false;
+
+  if (trackedSkillInstalls.length === 0) {
+    trackedSkillInstalls = detectInstalledSkillsFallback(projectRoot, homeDir);
+    fallbackDetectionUsed = trackedSkillInstalls.length > 0;
+  }
+
+  const skillsRemoved: string[] = [];
+  const skillsMissing: string[] = [];
+
+  for (const install of trackedSkillInstalls) {
+    if (removeTrackedSkillInstall(install)) {
+      skillsRemoved.push(path.normalize(install.path));
+    } else {
+      skillsMissing.push(path.normalize(install.path));
+    }
+  }
+
+  const gitignoreUpdated = shouldRemoveGitignoreEntry
+    ? removeGitignoreEntry(projectRoot)
+    : false;
+  const gitignoreSkipped = !shouldRemoveGitignoreEntry;
+
+  let feedbackDirRemoved = false;
+  const feedbackDirAbsent = !feedbackDirExists;
+  if (removeFeedbackDir && feedbackDirExists) {
+    fs.rmSync(feedbackDir, { recursive: true, force: true });
+    feedbackDirRemoved = true;
+  }
+
+  if (!removeFeedbackDir && configFound) {
+    const removedPaths = new Set(
+      trackedSkillInstalls.map((install) => path.normalize(install.path))
+    );
+    const remainingTracked = setupConfig.trackedSkillInstalls.filter(
+      (install) => !removedPaths.has(path.normalize(install.path))
+    );
+    writeSetupConfig(projectRoot, {
+      version: SETUP_CONFIG_VERSION,
+      trackedSkillInstalls: remainingTracked,
+      lastUpdatedAt: new Date().toISOString(),
+    });
+  }
+
+  return {
+    configFound,
+    fallbackDetectionUsed,
+    trackedSkillInstalls,
+    skillsRemoved,
+    skillsMissing,
+    feedbackDirRemoved,
+    feedbackDirAbsent,
+    gitignoreUpdated,
+    gitignoreSkipped,
   };
 }

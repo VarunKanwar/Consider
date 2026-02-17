@@ -15,6 +15,7 @@ import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
 import {
   SetupIntegrationInstall,
   runSetupAgentIntegration,
+  runUninstallAgentIntegration,
   SetupIntegrationTarget,
 } from './setup';
 import { archiveResolvedComments } from './archive';
@@ -310,6 +311,15 @@ class FeedbackLoopController {
         'feedback-loop.setupAgentIntegration',
         () => {
           void this.handleSetupAgentIntegration();
+        }
+      )
+    );
+
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        'feedback-loop.uninstallAgentIntegration',
+        () => {
+          void this.handleUninstallAgentIntegration();
         }
       )
     );
@@ -1017,6 +1027,116 @@ class FeedbackLoopController {
     }
   }
 
+  private async promptForUninstallPlan(): Promise<
+    { removeFeedbackDir: boolean; removeGitignoreEntry: boolean } | undefined
+  > {
+    interface UninstallOption extends vscode.QuickPickItem {
+      removeFeedbackDir: boolean;
+      removeGitignoreEntry: boolean;
+    }
+
+    const choices: UninstallOption[] = [
+      {
+        label: 'Full uninstall',
+        description: 'Remove .feedback data, deployed CLI, tracked skills, and .gitignore entry',
+        removeFeedbackDir: true,
+        removeGitignoreEntry: true,
+      },
+      {
+        label: 'Skills only',
+        description: 'Remove tracked skills and keep .feedback data in this workspace',
+        removeFeedbackDir: false,
+        removeGitignoreEntry: false,
+      },
+    ];
+
+    const selected = await vscode.window.showQuickPick(choices, {
+      placeHolder: 'Choose what Feedback uninstall should remove',
+      ignoreFocusOut: true,
+    });
+    if (!selected) {
+      return undefined;
+    }
+
+    const confirm = await vscode.window.showWarningMessage(
+      selected.removeFeedbackDir
+        ? 'This will remove Feedback Loop data and uninstall tracked skills. Continue?'
+        : 'This will uninstall tracked skills and keep .feedback data. Continue?',
+      { modal: true },
+      'Uninstall'
+    );
+
+    if (confirm !== 'Uninstall') {
+      return undefined;
+    }
+
+    return {
+      removeFeedbackDir: selected.removeFeedbackDir,
+      removeGitignoreEntry: selected.removeGitignoreEntry,
+    };
+  }
+
+  private async handleUninstallAgentIntegration(): Promise<void> {
+    try {
+      if (this.context.extensionMode === vscode.ExtensionMode.Test) {
+        runUninstallAgentIntegration(this.projectRoot, {
+          removeFeedbackDir: true,
+          removeGitignoreEntry: true,
+        });
+        this.reloadFromStore();
+        return;
+      }
+
+      const uninstallPlan = await this.promptForUninstallPlan();
+      if (uninstallPlan === undefined) {
+        return;
+      }
+
+      const result = runUninstallAgentIntegration(this.projectRoot, uninstallPlan);
+      this.reloadFromStore();
+
+      if (result.feedbackDirRemoved) {
+        await this.context.workspaceState.update('feedback-loop.setupPromptShown', false);
+      }
+
+      const summary: string[] = [];
+      if (result.feedbackDirRemoved) {
+        summary.push('.feedback removed');
+      } else if (uninstallPlan.removeFeedbackDir && result.feedbackDirAbsent) {
+        summary.push('.feedback already absent');
+      } else {
+        summary.push('.feedback retained');
+      }
+
+      if (result.gitignoreSkipped) {
+        summary.push('.gitignore unchanged');
+      } else if (result.gitignoreUpdated) {
+        summary.push('.gitignore updated');
+      } else {
+        summary.push('.gitignore already clean');
+      }
+
+      if (result.skillsRemoved.length > 0) {
+        summary.push(`skills removed (${result.skillsRemoved.length})`);
+      } else if (result.trackedSkillInstalls.length > 0) {
+        summary.push('tracked skills already absent');
+      } else {
+        summary.push('no tracked skills found');
+      }
+
+      if (result.fallbackDetectionUsed) {
+        summary.push('used fallback skill detection');
+      }
+
+      vscode.window.showInformationMessage(
+        `Feedback Loop uninstall complete: ${summary.join(', ')}.`
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      vscode.window.showErrorMessage(`Feedback uninstall failed: ${message}`);
+    }
+  }
+
   private async handleShowAllComments(): Promise<void> {
     const filterOptions: Array<{ label: string; value: CommentStatusFilter }> = [
       { label: 'All statuses', value: 'all' },
@@ -1510,6 +1630,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const cmds = [
       'feedback-loop.addComment',
       'feedback-loop.setupAgentIntegration',
+      'feedback-loop.uninstallAgentIntegration',
       'feedback-loop.showAllComments',
       'feedback-loop.archiveResolved',
       'feedback-loop.reconcileAll',

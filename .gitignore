@@ -6,3 +6,4 @@ test/out/
 *.vsix
 *.tgz
 .DS_Store
+extension/.vscode-test/
