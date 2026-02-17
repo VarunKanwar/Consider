@@ -14,7 +14,8 @@
     "onStartupFinished",
     "workspaceContains:.feedback/store.json",
     "onCommand:feedback-loop.addComment",
-    "onCommand:feedback-loop.setupAgentIntegration"
+    "onCommand:feedback-loop.setupAgentIntegration",
+    "onCommand:feedback-loop.uninstallAgentIntegration"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -42,6 +43,10 @@
       {
         "command": "feedback-loop.setupAgentIntegration",
         "title": "Feedback: Setup Agent Integration"
+      },
+      {
+        "command": "feedback-loop.uninstallAgentIntegration",
+        "title": "Feedback: Uninstall"
       },
       {
         "command": "feedback-loop.showAllComments",
@@ -101,7 +106,7 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test:host": "node ./test/runTest.js",
+    "test:host": "npm run compile && node ./test/runTest.js",
     "lint": "eslint src --ext ts",
     "pretest": "npm run compile"
   },
