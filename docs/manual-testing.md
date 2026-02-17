@@ -20,17 +20,30 @@
 2. Open the Command Palette (Cmd+Shift+P / Ctrl+Shift+P).
 3. Run **Feedback: Setup Agent Integration**.
 4. In the guided flow:
-   - choose whether to add `.feedback/` to `.gitignore`,
-   - choose integration behavior: install detected, choose manually, or skip.
+   - use the single setup panel to:
+     - choose whether to add `.feedback/` to `.gitignore`,
+     - check/uncheck integrations (Claude/OpenCode/Codex),
+     - set install location per selected integration (`Workspace` or `Home`) with the scope switch.
 4. **Expected:**
    - `.feedback/store.json` exists.
-   - `.feedback/bin/feedback-cli` and `.feedback/bin/feedback-cli.js` exist.
+   - `.feedback/bin/feedback-cli`, `.feedback/bin/feedback-cli.js`, and `.feedback/bin/feedback-cli.cjs` exist.
+   - `.feedback/bin/package.json` exists with `"type": "commonjs"`.
+   - `.feedback/shared/store.js` and `.feedback/shared/reconcile.js` exist.
+   - `.feedback/shared/package.json` exists with `"type": "commonjs"`.
    - If `.gitignore` update was selected, `.gitignore` contains `.feedback/` exactly once.
-   - If integration install was skipped, no new skill files / AGENTS section are written.
-   - If integrations were selected, only selected targets are written/updated:
-     - Claude: `.claude/skills/feedback-loop/SKILL.md`
-     - OpenCode: `.opencode/skills/feedback-loop/SKILL.md`
-     - Codex: upserted Feedback Loop section in `AGENTS.md`
+   - If no integrations are selected, no new skill files are written.
+   - If integrations were selected, only selected targets are written/updated using each target's selected location:
+     - Workspace install:
+       - Claude: `.claude/skills/feedback-loop/SKILL.md`
+       - OpenCode: `.opencode/skills/feedback-loop/SKILL.md`
+       - Codex: `.codex/skills/feedback-loop/SKILL.md`
+     - Home install:
+       - Claude: `~/.claude/skills/feedback-loop/SKILL.md`
+       - OpenCode: `~/.opencode/skills/feedback-loop/SKILL.md`
+       - Codex: `~/.codex/skills/feedback-loop/SKILL.md`
+   - Any written `SKILL.md` starts with YAML frontmatter containing:
+     - `name: feedback-loop`
+     - `description: ...`
 
 ## Test 3: Add a Comment
 
@@ -150,8 +163,8 @@ This is the key test for the file watcher.
    - Codex integration selected.
 2. **Expected:**
    - No duplicate `.feedback/` entries in `.gitignore`.
-   - No duplicate Feedback Loop section in `AGENTS.md`.
-   - Existing integration files are refreshed, not duplicated with extra copies.
+   - Existing skill files are refreshed in place (single file per target path for the selected install scope).
+   - Codex skill exists at `.codex/skills/feedback-loop/SKILL.md` (workspace scope) or `~/.codex/skills/feedback-loop/SKILL.md` (home scope).
 
 ## Test 15: No Workspace Folder
 

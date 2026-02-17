@@ -192,24 +192,23 @@
    - Detects agent footprints and installs integrations per spec behavior:
      - Claude Code skill: `.claude/skills/feedback-loop/SKILL.md`
      - OpenCode skill: `.opencode/skills/feedback-loop/SKILL.md`
-     - Codex docs section in `AGENTS.md` (upserted via markers).
-   - Implements fallback mode: when no agent config is detected, installs all three integrations.
+     - Codex skill: `.codex/skills/feedback-loop/SKILL.md`.
 
 2. **Extension command wiring** (`extension/src/extension.ts`)
    - Replaced Setup command stub with full setup execution.
-   - Setup command now reports an actionable summary (CLI deployed, gitignore updated, skills written, AGENTS section updated, fallback mode used when applicable).
+   - Setup command now reports an actionable summary (CLI deployed, gitignore updated, skills written).
    - Added explicit error handling with clear surfaced message if setup fails.
 
-3. **Codex/skill idempotency handling**
-   - Codex section in `AGENTS.md` uses markers and upsert logic.
-   - Re-running setup updates existing section instead of appending duplicate blocks.
+3. **Skill-file idempotency handling**
+   - Setup rewrites target skill files in place; reruns do not create duplicate files.
+   - `.gitignore` entry insertion remains duplicate-safe.
 
 4. **Phase 4 test coverage** (`test/extension/setup.test.ts`)
    - Added automated tests for setup behavior in four scenarios:
      - detected agents present,
-     - no agents detected (fallback to all),
+     - no agents detected,
      - partial detection behavior,
-     - idempotency for `.gitignore` and `AGENTS.md`.
+     - idempotency for `.gitignore` and skill files.
 
 5. **Manual testing guide updates** (`docs/manual-testing.md`)
    - Updated setup expectations to reflect full Phase 4 behavior.
@@ -229,9 +228,9 @@
 
 ### Implementation decisions not in the spec
 
-- **Codex section upsert markers:** used HTML markers in `AGENTS.md` to make repeated setup deterministic and avoid duplicates.
-- **Fallback strategy chosen:** when no `.claude/`, `.opencode/`, or `AGENTS.md` exists, setup creates all integrations automatically (no interactive prompt).
-- **Skill content is shared structure with agent-specific label:** Claude/OpenCode skill files share core command/convention text, with only installed-for labeling varied.
+- **Codex integration is skills-based:** setup writes a Codex skill at `.codex/skills/feedback-loop/SKILL.md` rather than mutating repo instruction files.
+- **Footprint detection spans workspace and home:** setup detection checks `.claude/`, `.opencode/`, and `.codex/` in both workspace and home; `.agents/` is still detected as legacy footprint compatibility.
+- **Skill content is shared structure with agent-specific label:** Claude/OpenCode/Codex skill files share core command/convention text, with only installed-for labeling varied.
 - **Setup logic extracted from extension controller:** pure setup behavior lives in `setup.ts` to enable reliable automated tests outside extension host.
 
 ### What's known to be incomplete
@@ -380,7 +379,8 @@
 1. **Setup core made explicit-opt-in for integrations** (`extension/src/setup.ts`)
    - Added setup options for:
      - optional `.gitignore` update (`addGitignoreEntry`),
-     - explicit integration targets (`integrationTargets`).
+     - explicit integration targets (`integrationTargets`),
+     - per-integration install plans (`integrationInstalls`) with project/home scope per target.
    - Removed implicit fallback behavior that auto-installed all integrations when no agent footprint was detected.
    - Added exported detection helpers for guided setup defaults:
      - `detectAgentIntegrations(projectRoot)`
@@ -389,8 +389,9 @@
 
 2. **Guided setup UX in extension command path** (`extension/src/extension.ts`)
    - `Feedback: Setup Agent Integration` is now a guided flow:
-     - asks whether to update `.gitignore`,
-     - asks integration behavior (install detected, choose manually, or skip),
+     - shows a single setup panel that includes `.gitignore` choice,
+     - includes checkboxes for Claude/OpenCode/Codex,
+     - includes workspace/home scope switches per selected integration in that same panel,
      - writes only explicitly selected integrations.
    - Setup completion message now reports selected/updated/skipped actions clearly.
 
@@ -404,6 +405,8 @@
    - Added/updated tests for:
      - baseline setup without integration writes by default,
      - explicit target installation behavior,
+     - home-scope skill installation behavior,
+     - mixed per-integration scope behavior in one setup run,
      - optional `.gitignore` update skip path,
      - idempotency with explicit targets,
      - integration footprint detection helpers.
@@ -412,6 +415,21 @@
    - Added first-run prompt expectations.
    - Updated setup test flow for guided choices and explicit consent behavior.
    - Updated setup idempotency test to reflect explicit target selection.
+
+6. **Skill file format hardening** (`extension/src/setup.ts`, `test/extension/setup.test.ts`)
+   - Skill generation now writes required YAML frontmatter (`name`, `description`) so Claude/OpenCode/Codex can index skills consistently.
+   - Added automated assertions that each selected integration gets correctly formatted `SKILL.md`.
+
+7. **CLI deployment hardening for ESM repos** (`extension/src/setup.ts`, `test/extension/setup.test.ts`)
+   - Setup now deploys a module-type-invariant launcher path:
+     - writes `.feedback/bin/feedback-cli.cjs`,
+     - rewrites `.feedback/bin/feedback-cli` to execute `feedback-cli.cjs`.
+   - Setup now copies required shared runtime modules into `.feedback/shared/` so deployed CLI imports resolve correctly.
+   - Setup now writes `.feedback/bin/package.json` and `.feedback/shared/package.json` with `"type": "commonjs"` so direct `.js` execution and shared imports remain stable inside ESM repositories.
+   - Added an automated test that executes the deployed CLI in a project with `package.json` `"type": "module"` and verifies it runs.
+
+8. **Thread-first guidance for non-actionable feedback** (`extension/src/setup.ts`, `docs/spec.md`)
+   - Skill content now instructs agents to prefer in-thread replies (without code edits) when a comment is informational or preference-only and does not request a change.
 
 ### What was tested
 
@@ -423,9 +441,12 @@
 
 1. **Setup prompt cadence:** first-run prompt is shown once per workspace state when `.feedback/store.json` is missing.
 2. **Guided defaults:** users can skip integrations explicitly; no implicit integration writes occur.
-3. **No custom store path in v1:** `.feedback/` remains fixed at project root for compatibility with existing CLI/store assumptions.
+3. **Skill install scope:** setup supports project-local and home-level install locations per selected integration in the same run.
+4. **Codex integration path:** Codex setup writes a skill file under `.codex/skills/feedback-loop/SKILL.md`; setup does not append content into `AGENTS.md`/`CLAUDE.md`.
+5. **No custom store path in v1:** `.feedback/` remains fixed at project root for compatibility with existing CLI/store assumptions.
+6. **Agent-specific formatting baseline:** setup now enforces a shared valid frontmatter shape (`name: feedback-loop`, `description: ...`) before markdown content.
+7. **Module-type invariance in deployed CLI:** setup emits a `.cjs` runtime entrypoint and copies shared modules under `.feedback/shared/` to avoid ESM/CJS and relative-import breakage in target repositories.
 
 ### What's known to be incomplete
 
-1. **Global skill install path remains out of scope for v1:** setup currently writes project-local integrations only.
-2. **Onboarding wizard remains command/prompt based:** no custom webview wizard has been added.
+1. **Onboarding wizard remains command/prompt based:** no custom webview wizard has been added.

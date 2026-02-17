@@ -106,7 +106,13 @@ The directory structure:
 ├── store.json              # All comments, threads, and anchors
 ├── bin/
 │   ├── feedback-cli        # Shell wrapper (#!/bin/sh)
-│   └── feedback-cli.js     # Node.js implementation
+│   ├── feedback-cli.js     # Source-compatible JS artifact
+│   ├── feedback-cli.cjs    # Runtime entrypoint (module-type invariant)
+│   └── package.json        # {"type":"commonjs"} for local runtime scope
+├── shared/
+│   ├── store.js            # Shared store logic used by deployed CLI
+│   ├── reconcile.js        # Shared reconcile logic used by deployed CLI
+│   └── package.json        # {"type":"commonjs"} for local runtime scope
 └── config.json             # Optional: extension/CLI configuration
 ```
 
@@ -267,10 +273,10 @@ The CLI is a standalone Node.js script with **zero npm dependencies** — only N
 **Shell wrapper** (`.feedback/bin/feedback-cli`):
 ```sh
 #!/bin/sh
-exec node "$(dirname "$0")/feedback-cli.js" "$@"
+exec node "$(dirname "$0")/feedback-cli.cjs" "$@"
 ```
 
-**Why Node.js:** JSON is the native data format. Content-based anchor matching requires string similarity comparisons that are painful in pure shell. Node is guaranteed to be present for any developer using VS Code (which requires Node), and a single `.js` file with no dependencies requires zero installation.
+**Why Node.js:** JSON is the native data format. Content-based anchor matching requires string similarity comparisons that are painful in pure shell. Node is guaranteed to be present for any developer using VS Code (which requires Node), and a tiny set of dependency-free runtime files requires zero installation.
 
 ### 6.2 Commands
 
@@ -358,6 +364,7 @@ A comment thread is a *scoped* discussion about a specific code location. The ma
 - The developer uses comment threads for specific, located feedback ("this line should do X").
 - The developer uses the main conversation for high-level direction ("now implement the changes from my review").
 - The agent uses comment threads for located responses ("agreed, I'll change this") and the main conversation for broader status updates ("I've addressed all 5 feedback items, here's a summary").
+- If a thread comment is informational or preference-only (no explicit change request), the agent should prefer replying in-thread without editing code.
 - If the agent finds that the overall set of comments suggests a significant directional disagreement (not just line-level fixes), it should raise this in the main conversation rather than replying piecemeal in threads.
 
 The skill file should explain these conventions to the agent.
@@ -378,13 +385,23 @@ Comment threads are *not* part of the main conversation history. They exist in t
 
 The "Setup Agent Integration" command can write skill files into the project when the developer explicitly opts in. Each skill file explains the feedback system to the agent: what the CLI commands are, what the conventions are, and how to use them.
 
-**For Claude Code:** `.claude/skills/feedback-loop/SKILL.md`
+**For Claude Code:**
+- Project-local: `.claude/skills/feedback-loop/SKILL.md`
+- Home-level: `~/.claude/skills/feedback-loop/SKILL.md`
 
-**For OpenCode:** `.opencode/skills/feedback-loop/SKILL.md` (OpenCode also reads `.claude/skills/` as a fallback, so the Claude Code file might suffice, but having a dedicated one is cleaner.)
+**For OpenCode:**
+- Project-local: `.opencode/skills/feedback-loop/SKILL.md`
+- Home-level: `~/.opencode/skills/feedback-loop/SKILL.md`
+  (OpenCode also reads `.claude/skills/` as a fallback, so the Claude Code file might suffice, but having a dedicated one is cleaner.)
 
-**For Codex:** Codex reads `AGENTS.md` (or similar convention files). The setup command should append a section to the project's `AGENTS.md` (or create one) documenting the feedback CLI. Alternatively, if Codex supports a skill-file convention similar to Claude Code, use that.
+**For Codex:**
+- Project-local: `.codex/skills/feedback-loop/SKILL.md`
+- Home-level: `~/.codex/skills/feedback-loop/SKILL.md`
 
 **Skill file content should include:**
+- Required YAML frontmatter for the target agent:
+  - `name` (use `feedback-loop`, lowercase with hyphens),
+  - `description` (when and why the skill should be used).
 - What the feedback system is and why it exists.
 - The full CLI command reference with examples.
 - Conventions: when to reply in a thread vs. elevate to the main conversation, how to handle stale comments, when to resolve threads.
@@ -396,15 +413,15 @@ When the developer runs "Feedback: Setup Agent Integration":
 
 1. Create `.feedback/` directory if it doesn't exist.
 2. Create `.feedback/bin/` and copy/generate the CLI tool files.
-3. Add `.feedback/` to `.gitignore` (append if `.gitignore` exists, create if not). Check for existing entries to avoid duplicates.
-4. Run a guided setup flow (extension-first onboarding) with explicit choices:
-   - Initialize/repair project-local Feedback Loop files (required baseline).
-   - Add `.feedback/` to `.gitignore` (recommended default: yes).
-   - Install/update agent integrations (optional, explicit opt-in).
-5. If integrations are selected, detect existing agent footprints and let the developer confirm targets (Claude/OpenCode/Codex) before writing files.
-6. Print a summary of what was set up.
+3. Show a single setup panel (extension-first onboarding) with explicit choices:
+   - whether to add `.feedback/` to `.gitignore` (recommended default: yes),
+   - which integrations to install (Claude/OpenCode/Codex),
+   - one install location per selected integration (project-local or home-level).
+   - allow leaving all integrations unchecked to skip skill installation for now.
+4. If `.gitignore` was selected, add `.feedback/` to `.gitignore` (append if `.gitignore` exists, create if not), avoiding duplicates.
+5. Print a summary of what was set up.
 
-For v1, the feedback store location remains fixed at `<project-root>/.feedback/` and is not user-configurable.
+For v1, the feedback store location remains fixed at `<project-root>/.feedback/` and is not user-configurable. Skill install location is configurable per selected integration (project-local or home-level).
 
 ### 8.3 No MCP (For Now)
 

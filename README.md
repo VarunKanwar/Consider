@@ -34,13 +34,14 @@ Under active development. See `docs/spec.md` for the full technical specificatio
 1. Open a workspace in VS Code with the Feedback Loop extension active.
 2. Run **Feedback: Setup Agent Integration** from the Command Palette.
 3. In setup, choose:
-   - whether to add `.feedback/` to `.gitignore`,
-   - whether to install integrations now (detected/manual/skip).
+   - in one setup panel, whether to add `.feedback/` to `.gitignore`,
+   - which integrations to install (checkboxes),
+   - for each selected integration, whether to install in workspace or home (switch).
 4. Start leaving inline feedback in files (gutter `+`), then use `.feedback/bin/feedback-cli` for agent-side replies.
 
 Notes:
 - Feedback data stays in fixed project-local path: `.feedback/`.
-- Agent integrations are explicit opt-in during setup.
+- Agent integrations are explicit opt-in during setup, with per-integration install scope selection.
 
 ## Documentation
 

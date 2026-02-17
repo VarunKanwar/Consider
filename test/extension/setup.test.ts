@@ -28,7 +28,9 @@ function writeFile(baseDir, relativePath, content) {
 
 function makeCliSource(baseDir) {
   const cliDir = path.join(baseDir, 'cli-src');
+  const sharedDir = path.join(baseDir, 'shared');
   fs.mkdirSync(cliDir, { recursive: true });
+  fs.mkdirSync(sharedDir, { recursive: true });
   writeFile(
     baseDir,
     'cli-src/feedback-cli',
@@ -38,6 +40,16 @@ function makeCliSource(baseDir) {
     baseDir,
     'cli-src/feedback-cli.js',
     '#!/usr/bin/env node\nconsole.log("feedback-cli stub");\n'
+  );
+  writeFile(
+    baseDir,
+    'shared/store.js',
+    'module.exports = {};\n'
+  );
+  writeFile(
+    baseDir,
+    'shared/reconcile.js',
+    'module.exports = {};\n'
   );
   return cliDir;
 }
@@ -56,6 +68,13 @@ function countOccurrences(haystack, needle) {
     index = found + needle.length;
   }
   return count;
+}
+
+function assertHasSkillFrontmatter(skillContent) {
+  assert.ok(skillContent.startsWith('---\n'));
+  assert.ok(skillContent.includes('\nname: feedback-loop\n'));
+  assert.ok(skillContent.includes('\ndescription: '));
+  assert.ok(skillContent.includes('\n---\n\n# Feedback Loop\n'));
 }
 
 describe('setup agent integration', () => {
@@ -80,21 +99,26 @@ describe('setup agent integration', () => {
     assert.equal(result.gitignoreUpdated, true);
     assert.equal(result.gitignoreSkipped, false);
     assert.equal(result.skillsWritten.length, 0);
-    assert.equal(result.codexSectionUpdated, false);
     assert.equal(result.integrationTargetsRequested.length, 0);
+    assert.equal(result.integrationInstallsRequested.length, 0);
 
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'store.json')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli.js')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli.cjs')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'package.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'store.js')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'reconcile.js')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'package.json')));
     assert.ok(
       fs
         .readFileSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli'), 'utf-8')
-        .includes('feedback-cli.js')
+        .includes('feedback-cli.cjs')
     );
     assert.ok(read('.gitignore', projectRoot).includes('.feedback/'));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.claude')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
-    assert.ok(!fs.existsSync(path.join(projectRoot, 'AGENTS.md')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex')));
   });
 
   it('installs only explicitly requested integration targets', () => {
@@ -108,12 +132,17 @@ describe('setup agent integration', () => {
     assert.equal(result.integrationTargetsRequested.length, 2);
     assert.ok(result.integrationTargetsRequested.includes('claude'));
     assert.ok(result.integrationTargetsRequested.includes('codex'));
+    assert.deepEqual(result.integrationInstallsRequested, [
+      { target: 'claude', scope: 'project' },
+      { target: 'codex', scope: 'project' },
+    ]);
     assert.ok(
       fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
     );
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
-    assert.ok(fs.existsSync(path.join(projectRoot, 'AGENTS.md')));
-    assert.ok(read('AGENTS.md', projectRoot).includes('feedback-loop:codex:start'));
+    assert.ok(
+      fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
   });
 
   it('supports skipping .gitignore updates', () => {
@@ -126,11 +155,118 @@ describe('setup agent integration', () => {
 
     assert.equal(result.gitignoreUpdated, false);
     assert.equal(result.gitignoreSkipped, true);
+    assert.equal(result.integrationInstallsRequested.length, 0);
     assert.equal(read('.gitignore', projectRoot), 'node_modules/\n');
   });
 
-  it('is idempotent for .gitignore and AGENTS codex section with explicit targets', () => {
-    writeFile(projectRoot, 'AGENTS.md', '# Existing Agents\n');
+  it('writes selected skills to home when integration scope is home', () => {
+    const controlledHome = path.join(projectRoot, 'fake-home');
+    fs.mkdirSync(controlledHome, { recursive: true });
+
+    const result = runSetupAgentIntegration(projectRoot, {
+      cliSourceDir,
+      integrationTargets: ['claude', 'opencode', 'codex'],
+      integrationScope: 'home',
+      homeDir: controlledHome,
+    });
+
+    assert.deepEqual(result.integrationInstallsRequested, [
+      { target: 'claude', scope: 'home' },
+      { target: 'opencode', scope: 'home' },
+      { target: 'codex', scope: 'home' },
+    ]);
+    assert.ok(
+      fs.existsSync(path.join(controlledHome, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
+    assert.ok(
+      fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
+    assert.ok(
+      fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.claude')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex')));
+  });
+
+  it('supports per-integration install scopes in a single setup run', () => {
+    const controlledHome = path.join(projectRoot, 'fake-home');
+    fs.mkdirSync(controlledHome, { recursive: true });
+
+    const result = runSetupAgentIntegration(projectRoot, {
+      cliSourceDir,
+      integrationInstalls: [
+        { target: 'claude', scope: 'project' },
+        { target: 'opencode', scope: 'home' },
+        { target: 'codex', scope: 'home' },
+      ],
+      homeDir: controlledHome,
+    });
+
+    assert.equal(result.integrationTargetsRequested.length, 3);
+    assert.deepEqual(result.integrationInstallsRequested, [
+      { target: 'claude', scope: 'project' },
+      { target: 'opencode', scope: 'home' },
+      { target: 'codex', scope: 'home' },
+    ]);
+    assert.ok(
+      fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
+    assert.ok(
+      fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
+    assert.ok(
+      fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+    );
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex')));
+  });
+
+  it('writes correctly formatted skill files for each selected agent', () => {
+    runSetupAgentIntegration(projectRoot, {
+      cliSourceDir,
+      integrationTargets: ['claude', 'opencode', 'codex'],
+    });
+
+    const claudeSkill = read('.claude/skills/feedback-loop/SKILL.md', projectRoot);
+    const openCodeSkill = read('.opencode/skills/feedback-loop/SKILL.md', projectRoot);
+    const codexSkill = read('.codex/skills/feedback-loop/SKILL.md', projectRoot);
+
+    assertHasSkillFrontmatter(claudeSkill);
+    assertHasSkillFrontmatter(openCodeSkill);
+    assertHasSkillFrontmatter(codexSkill);
+    assert.ok(
+      codexSkill.includes(
+        'If a comment is informational or preference-only (no explicit change request), prefer a thread reply without making code edits.'
+      )
+    );
+  });
+
+  it('deploys a runnable CLI in package type=module projects', () => {
+    const realCliSourceDir = path.join(ROOT, 'cli');
+    writeFile(projectRoot, 'package.json', '{"type":"module"}\n');
+
+    const result = runSetupAgentIntegration(projectRoot, {
+      cliSourceDir: realCliSourceDir,
+    });
+
+    assert.ok(result.cliCopied.length >= 5);
+    const run = require('child_process').spawnSync(
+      path.join(projectRoot, '.feedback', 'bin', 'feedback-cli'),
+      ['summary'],
+      {
+        cwd: projectRoot,
+        encoding: 'utf-8',
+      }
+    );
+    assert.equal(run.status, 0, run.stderr);
+    assert.ok(
+      run.stdout.includes('No feedback comments.') ||
+      run.stdout.includes('Open comments: 0')
+    );
+  });
+
+  it('is idempotent for .gitignore and codex skill file with explicit targets', () => {
     writeFile(projectRoot, '.gitignore', 'node_modules/\n');
 
     const first = runSetupAgentIntegration(projectRoot, {
@@ -148,21 +284,27 @@ describe('setup agent integration', () => {
     const gitignore = read('.gitignore', projectRoot);
     assert.equal(countOccurrences(gitignore, '.feedback/'), 1);
 
-    const agents = read('AGENTS.md', projectRoot);
-    assert.equal(countOccurrences(agents, 'feedback-loop:codex:start'), 1);
-    assert.equal(countOccurrences(agents, 'feedback-loop:codex:end'), 1);
+    const codexSkill = read('.codex/skills/feedback-loop/SKILL.md', projectRoot);
+    assertHasSkillFrontmatter(codexSkill);
+    assert.equal(countOccurrences(codexSkill, '\nname: feedback-loop\n'), 1);
   });
 
   it('detects existing integration footprints for guided setup defaults', () => {
+    const controlledHome = path.join(projectRoot, 'fake-home');
+    fs.mkdirSync(controlledHome, { recursive: true });
     fs.mkdirSync(path.join(projectRoot, '.claude'), { recursive: true });
-    writeFile(projectRoot, 'AGENTS.md', '# Existing\n');
+    fs.mkdirSync(path.join(projectRoot, '.codex'), { recursive: true });
+    fs.mkdirSync(path.join(controlledHome, '.codex'), { recursive: true });
 
-    const detection = detectAgentIntegrations(projectRoot);
+    const detection = detectAgentIntegrations(projectRoot, { homeDir: controlledHome });
     const targets = getDetectedIntegrationTargets(detection);
 
     assert.equal(detection.claudeDirExists, true);
     assert.equal(detection.openCodeDirExists, false);
-    assert.equal(detection.agentsMdExists, true);
+    assert.equal(detection.codexDirExists, true);
+    assert.equal(detection.agentsDirExists, false);
+    assert.equal(detection.homeCodexDirExists, true);
+    assert.equal(detection.homeAgentsDirExists, false);
     assert.equal(detection.noneDetected, false);
     assert.deepEqual(targets, ['claude', 'codex']);
   });

@@ -18,7 +18,7 @@ This project is built in phases. **Complete one phase fully before starting the 
 - **Phase 4: Agent integration setup** — "Setup Agent Integration" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
 - **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
 - **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
-- **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.feedback/` fixed at project root, and make agent skill installation explicit opt-in (not implicit side effect).
+- **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.feedback/` fixed at project root, make agent skill installation explicit opt-in (not implicit side effect), and let users choose workspace vs home skill install scope.
 
 When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
 
@@ -128,7 +128,7 @@ Every phase must include tests. What "tests" means varies by phase:
 
 **Phase 3 (Anchoring):** Automated tests with specific edit scenarios. Spec Section 4.3 lists the patterns to test: insertion above a comment, deletion of lines around a comment, function rename, file deletion. Create fixture files, apply known edits, verify re-anchored positions and staleness detection. These tests must cover both the CLI and extension implementations and verify they produce the same results.
 
-**Phase 4 (Agent setup):** Verify the setup command creates correct directory structure, generates valid skill files, appends to `.gitignore` without duplicates. Test with and without existing `.claude/`, `.opencode/`, `AGENTS.md` directories.
+**Phase 4 (Agent setup):** Verify the setup command creates correct directory structure, generates valid skill files, appends to `.gitignore` without duplicates. Test with and without existing `.claude/`, `.opencode/`, and `.codex/` directories (plus legacy `.agents/` detection compatibility).
 
 **Phase 5 (Polish):** Manual testing for UI features (tree view, archive). Automated tests for any new logic.
 

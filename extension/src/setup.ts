@@ -1,26 +1,54 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { emptyStore, storePath, writeStore } from './store';
 
 const CLAUDE_SKILL_PATH = ['.claude', 'skills', 'feedback-loop', 'SKILL.md'];
 const OPENCODE_SKILL_PATH = ['.opencode', 'skills', 'feedback-loop', 'SKILL.md'];
-const CODEX_SECTION_START = '<!-- feedback-loop:codex:start -->';
-const CODEX_SECTION_END = '<!-- feedback-loop:codex:end -->';
+const CODEX_SKILL_PATH = ['.codex', 'skills', 'feedback-loop', 'SKILL.md'];
+const SKILL_NAME = 'feedback-loop';
+
+const SKILL_DESCRIPTIONS: Record<SetupIntegrationTarget, string> = {
+  claude:
+    'Use when this repository has Feedback Loop enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+  opencode:
+    'Use when this repository has Feedback Loop enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+  codex:
+    'Use when this repository has Feedback Loop enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+};
 
 export interface AgentDetection {
   claudeDirExists: boolean;
   openCodeDirExists: boolean;
-  agentsMdExists: boolean;
+  codexDirExists: boolean;
+  agentsDirExists: boolean;
+  homeClaudeDirExists: boolean;
+  homeOpenCodeDirExists: boolean;
+  homeCodexDirExists: boolean;
+  homeAgentsDirExists: boolean;
   noneDetected: boolean;
+}
+
+export interface AgentDetectionOptions {
+  homeDir?: string;
 }
 
 export interface SetupOptions {
   cliSourceDir: string;
   addGitignoreEntry?: boolean;
   integrationTargets?: SetupIntegrationTarget[];
+  integrationInstalls?: SetupIntegrationInstall[];
+  integrationScope?: SetupIntegrationScope;
+  homeDir?: string;
 }
 
 export type SetupIntegrationTarget = 'claude' | 'opencode' | 'codex';
+export type SetupIntegrationScope = 'project' | 'home';
+
+export interface SetupIntegrationInstall {
+  target: SetupIntegrationTarget;
+  scope: SetupIntegrationScope;
+}
 
 export interface SetupResult {
   feedbackDirCreated: boolean;
@@ -30,9 +58,9 @@ export interface SetupResult {
   gitignoreUpdated: boolean;
   gitignoreSkipped: boolean;
   skillsWritten: string[];
-  codexSectionUpdated: boolean;
   detection: AgentDetection;
   integrationTargetsRequested: SetupIntegrationTarget[];
+  integrationInstallsRequested: SetupIntegrationInstall[];
 }
 
 function ensureDirectory(dirPath: string): boolean {
@@ -73,26 +101,72 @@ function ensureGitignoreEntry(projectRoot: string): boolean {
   return true;
 }
 
-export function detectAgentIntegrations(projectRoot: string): AgentDetection {
+export function detectAgentIntegrations(
+  projectRoot: string,
+  options: AgentDetectionOptions = {}
+): AgentDetection {
+  const homeDir = options.homeDir ?? os.homedir();
   const claudeDirExists = fs.existsSync(path.join(projectRoot, '.claude'));
   const openCodeDirExists = fs.existsSync(path.join(projectRoot, '.opencode'));
-  const agentsMdExists = fs.existsSync(path.join(projectRoot, 'AGENTS.md'));
-  const noneDetected = !claudeDirExists && !openCodeDirExists && !agentsMdExists;
-  return { claudeDirExists, openCodeDirExists, agentsMdExists, noneDetected };
+  const codexDirExists = fs.existsSync(path.join(projectRoot, '.codex'));
+  const agentsDirExists = fs.existsSync(path.join(projectRoot, '.agents'));
+  const homeClaudeDirExists = fs.existsSync(path.join(homeDir, '.claude'));
+  const homeOpenCodeDirExists = fs.existsSync(path.join(homeDir, '.opencode'));
+  const homeCodexDirExists = fs.existsSync(path.join(homeDir, '.codex'));
+  const homeAgentsDirExists = fs.existsSync(path.join(homeDir, '.agents'));
+  const noneDetected = !claudeDirExists &&
+    !openCodeDirExists &&
+    !codexDirExists &&
+    !agentsDirExists &&
+    !homeClaudeDirExists &&
+    !homeOpenCodeDirExists &&
+    !homeCodexDirExists &&
+    !homeAgentsDirExists;
+  return {
+    claudeDirExists,
+    openCodeDirExists,
+    codexDirExists,
+    agentsDirExists,
+    homeClaudeDirExists,
+    homeOpenCodeDirExists,
+    homeCodexDirExists,
+    homeAgentsDirExists,
+    noneDetected,
+  };
 }
 
 export function getDetectedIntegrationTargets(
   detection: AgentDetection
 ): SetupIntegrationTarget[] {
   const targets: SetupIntegrationTarget[] = [];
-  if (detection.claudeDirExists) targets.push('claude');
-  if (detection.openCodeDirExists) targets.push('opencode');
-  if (detection.agentsMdExists) targets.push('codex');
+  if (detection.claudeDirExists || detection.homeClaudeDirExists) {
+    targets.push('claude');
+  }
+  if (detection.openCodeDirExists || detection.homeOpenCodeDirExists) {
+    targets.push('opencode');
+  }
+  if (
+    detection.codexDirExists ||
+    detection.agentsDirExists ||
+    detection.homeCodexDirExists ||
+    detection.homeAgentsDirExists
+  ) {
+    targets.push('codex');
+  }
   return targets;
 }
 
-function buildSkillMarkdown(agentName: string): string {
-  return `# Feedback Loop
+function buildSkillMarkdown(target: SetupIntegrationTarget): string {
+  const frontmatter = [
+    '---',
+    `name: ${SKILL_NAME}`,
+    `description: ${SKILL_DESCRIPTIONS[target]}`,
+    '---',
+    '',
+  ].join('\n');
+
+  return `${frontmatter}
+# Feedback Loop
 
 You are configured with Feedback Loop inline review comments for this repository.
 Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedback.
@@ -114,6 +188,7 @@ Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedb
 - Treat \`open\` comments as actionable review items.
 - Treat \`stale\` comments as potentially outdated: flag in main chat before acting.
 - Treat \`orphaned\` comments as file-move/delete follow-up.
+- If a comment is informational or preference-only (no explicit change request), prefer a thread reply without making code edits.
 - Keep file-specific discussion in comment threads; use main chat for cross-cutting decisions.
 - The source-of-truth store is \`.feedback/store.json\`; use the CLI unless debugging.
 
@@ -125,71 +200,25 @@ Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedb
 - \`.feedback/bin/feedback-cli reply <comment-id> --message "..." \`
 - \`.feedback/bin/feedback-cli resolve <comment-id>\`
 - \`.feedback/bin/feedback-cli summary [--json]\`
-
-Installed for: ${agentName}
 `;
 }
 
-function buildCodexSection(): string {
-  return `${CODEX_SECTION_START}
-## Feedback Loop Integration
-
-This project uses Feedback Loop for inline file-anchored review threads.
-
-When asked to check feedback:
-
-1. Run \`.feedback/bin/feedback-cli summary\`.
-2. Run \`.feedback/bin/feedback-cli list\` (or \`--file <path>\` when scoped).
-3. For each open comment, run \`.feedback/bin/feedback-cli context <comment-id>\`.
-4. Reply with \`.feedback/bin/feedback-cli reply <comment-id> --message "..." \`.
-5. Resolve with \`.feedback/bin/feedback-cli resolve <comment-id>\` once addressed.
-
-State handling:
-
-- \`open\`: process normally.
-- \`stale\`: confirm with developer before applying potentially outdated changes.
-- \`orphaned\`: file no longer exists; ask for re-anchor/move details.
-
-Primary store path: \`.feedback/store.json\` (CLI preferred over direct editing).
-${CODEX_SECTION_END}
-`;
-}
-
-function upsertCodexSection(projectRoot: string): boolean {
-  const agentsPath = path.join(projectRoot, 'AGENTS.md');
-  const existing = fs.existsSync(agentsPath)
-    ? normalizeNewline(fs.readFileSync(agentsPath, 'utf-8'))
-    : '';
-  const section = buildCodexSection();
-
-  let next = existing;
-  const startIdx = existing.indexOf(CODEX_SECTION_START);
-  const endIdx = existing.indexOf(CODEX_SECTION_END);
-
-  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
-    const afterEnd = endIdx + CODEX_SECTION_END.length;
-    next = `${existing.slice(0, startIdx)}${section}${existing.slice(afterEnd)}`;
-  } else {
-    const trimmed = trimTrailingBlankLines(existing);
-    const separator = trimmed.length > 0 ? '\n\n' : '';
-    next = `${trimmed}${separator}${section}`;
-  }
-
-  if (next === existing) {
-    return false;
-  }
-  fs.writeFileSync(agentsPath, next.endsWith('\n') ? next : `${next}\n`, 'utf-8');
-  return true;
-}
-
-function writeSkillFile(projectRoot: string, relativeSegments: string[], agentName: string): string {
-  const targetPath = path.join(projectRoot, ...relativeSegments);
+function writeSkillFile(
+  baseDir: string,
+  relativeSegments: string[],
+  target: SetupIntegrationTarget
+): string {
+  const targetPath = path.join(baseDir, ...relativeSegments);
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.writeFileSync(targetPath, buildSkillMarkdown(agentName), 'utf-8');
+  fs.writeFileSync(targetPath, buildSkillMarkdown(target), 'utf-8');
   return targetPath;
 }
 
-function copyCli(cliSourceDir: string, destinationBinDir: string): string[] {
+function copyCli(
+  cliSourceDir: string,
+  destinationFeedbackDir: string,
+  destinationBinDir: string
+): string[] {
   const files = ['feedback-cli', 'feedback-cli.js'];
   const copied: string[] = [];
 
@@ -203,7 +232,48 @@ function copyCli(cliSourceDir: string, destinationBinDir: string): string[] {
     copied.push(destination);
   }
 
-  fs.chmodSync(path.join(destinationBinDir, 'feedback-cli'), 0o755);
+  // Always ship a .cjs runtime entrypoint so the CLI works in repos with
+  // package.json type=module.
+  const cjsDestination = path.join(destinationBinDir, 'feedback-cli.cjs');
+  fs.copyFileSync(path.join(destinationBinDir, 'feedback-cli.js'), cjsDestination);
+  copied.push(cjsDestination);
+
+  const launcherPath = path.join(destinationBinDir, 'feedback-cli');
+  fs.writeFileSync(
+    launcherPath,
+    '#!/bin/sh\nexec node "$(dirname "$0")/feedback-cli.cjs" "$@"\n',
+    'utf-8'
+  );
+  const binPackageJsonPath = path.join(destinationBinDir, 'package.json');
+  fs.writeFileSync(
+    binPackageJsonPath,
+    '{\n  "type": "commonjs"\n}\n',
+    'utf-8'
+  );
+  copied.push(binPackageJsonPath);
+
+  // The CLI depends on shared runtime modules relative to .feedback/bin.
+  const sharedSourceDir = path.resolve(cliSourceDir, '..', 'shared');
+  const sharedDestinationDir = path.join(destinationFeedbackDir, 'shared');
+  fs.mkdirSync(sharedDestinationDir, { recursive: true });
+  for (const file of ['store.js', 'reconcile.js']) {
+    const source = path.join(sharedSourceDir, file);
+    if (!fs.existsSync(source)) {
+      throw new Error(`Shared source file not found: ${source}`);
+    }
+    const destination = path.join(sharedDestinationDir, file);
+    fs.copyFileSync(source, destination);
+    copied.push(destination);
+  }
+  const sharedPackageJsonPath = path.join(sharedDestinationDir, 'package.json');
+  fs.writeFileSync(
+    sharedPackageJsonPath,
+    '{\n  "type": "commonjs"\n}\n',
+    'utf-8'
+  );
+  copied.push(sharedPackageJsonPath);
+
+  fs.chmodSync(launcherPath, 0o755);
   return copied;
 }
 
@@ -225,6 +295,36 @@ function normalizeIntegrationTargets(
   return normalized;
 }
 
+function normalizeIntegrationInstalls(
+  installs: SetupIntegrationInstall[] | undefined,
+  targets: SetupIntegrationTarget[] | undefined,
+  integrationScope: SetupIntegrationScope | undefined
+): SetupIntegrationInstall[] {
+  const normalized: SetupIntegrationInstall[] = [];
+  const seen = new Set<SetupIntegrationTarget>();
+
+  if (installs && installs.length > 0) {
+    for (const install of installs) {
+      if (seen.has(install.target)) {
+        continue;
+      }
+      seen.add(install.target);
+      normalized.push({
+        target: install.target,
+        scope: install.scope,
+      });
+    }
+    return normalized;
+  }
+
+  const fallbackScope: SetupIntegrationScope = integrationScope ?? 'project';
+  for (const target of normalizeIntegrationTargets(targets)) {
+    normalized.push({ target, scope: fallbackScope });
+  }
+
+  return normalized;
+}
+
 export function runSetupAgentIntegration(
   projectRoot: string,
   options: SetupOptions
@@ -240,36 +340,47 @@ export function runSetupAgentIntegration(
     writeStore(projectRoot, emptyStore());
   }
 
-  const cliCopied = copyCli(options.cliSourceDir, binDir);
+  const cliCopied = copyCli(options.cliSourceDir, feedbackDir, binDir);
   const addGitignoreEntry = options.addGitignoreEntry ?? true;
   const gitignoreUpdated = addGitignoreEntry
     ? ensureGitignoreEntry(projectRoot)
     : false;
   const gitignoreSkipped = !addGitignoreEntry;
 
-  const detection = detectAgentIntegrations(projectRoot);
-  const integrationTargetsRequested = normalizeIntegrationTargets(
-    options.integrationTargets
+  const detection = detectAgentIntegrations(projectRoot, { homeDir: options.homeDir });
+  const integrationInstallsRequested = normalizeIntegrationInstalls(
+    options.integrationInstalls,
+    options.integrationTargets,
+    options.integrationScope
   );
-  const targetSet = new Set<SetupIntegrationTarget>(integrationTargetsRequested);
+  const integrationTargetsRequested = integrationInstallsRequested.map(
+    (install) => install.target
+  );
 
   const skillsWritten: string[] = [];
-  let codexSectionUpdated = false;
 
-  if (targetSet.has('claude')) {
-    skillsWritten.push(
-      writeSkillFile(projectRoot, CLAUDE_SKILL_PATH, 'Claude Code')
-    );
-  }
+  for (const install of integrationInstallsRequested) {
+    const skillBaseDir = install.scope === 'home'
+      ? options.homeDir ?? os.homedir()
+      : projectRoot;
 
-  if (targetSet.has('opencode')) {
-    skillsWritten.push(
-      writeSkillFile(projectRoot, OPENCODE_SKILL_PATH, 'OpenCode')
-    );
-  }
-
-  if (targetSet.has('codex')) {
-    codexSectionUpdated = upsertCodexSection(projectRoot);
+    if (install.target === 'claude') {
+      skillsWritten.push(
+        writeSkillFile(skillBaseDir, CLAUDE_SKILL_PATH, 'claude')
+      );
+      continue;
+    }
+    if (install.target === 'opencode') {
+      skillsWritten.push(
+        writeSkillFile(skillBaseDir, OPENCODE_SKILL_PATH, 'opencode')
+      );
+      continue;
+    }
+    if (install.target === 'codex') {
+      skillsWritten.push(
+        writeSkillFile(skillBaseDir, CODEX_SKILL_PATH, 'codex')
+      );
+    }
   }
 
   return {
@@ -280,8 +391,8 @@ export function runSetupAgentIntegration(
     gitignoreUpdated,
     gitignoreSkipped,
     skillsWritten,
-    codexSectionUpdated,
     detection,
     integrationTargetsRequested,
+    integrationInstallsRequested,
   };
 }

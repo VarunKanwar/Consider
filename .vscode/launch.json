@@ -6,7 +6,12 @@
       "type": "extensionHost",
       "request": "launch",
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/extension"
+        "--extensionDevelopmentPath=${workspaceFolder}/extension",
+        "--disable-restore-windows",
+        "--new-window",
+        "--user-data-dir=${workspaceFolder}/.vscode/ext-host-user-data",
+        "--extensions-dir=${workspaceFolder}/.vscode/ext-host-extensions",
+        "${workspaceFolder}"
       ],
       "outFiles": [
         "${workspaceFolder}/extension/out/**/*.js"

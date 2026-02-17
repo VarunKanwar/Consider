@@ -31,7 +31,7 @@ suite('Feedback Loop Extension Host', () => {
     removeIfExists(path.join(root, '.feedback'));
     removeIfExists(path.join(root, '.claude'));
     removeIfExists(path.join(root, '.opencode'));
-    removeIfExists(path.join(root, 'AGENTS.md'));
+    removeIfExists(path.join(root, '.codex'));
     removeIfExists(path.join(root, '.gitignore'));
 
     const samplePath = path.join(root, 'src', 'sample.ts');
@@ -55,14 +55,15 @@ suite('Feedback Loop Extension Host', () => {
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli')));
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli.js')));
+    assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli.cjs')));
+    assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'package.json')));
+    assert.ok(fs.existsSync(path.join(root, '.feedback', 'shared', 'store.js')));
+    assert.ok(fs.existsSync(path.join(root, '.feedback', 'shared', 'reconcile.js')));
+    assert.ok(fs.existsSync(path.join(root, '.feedback', 'shared', 'package.json')));
     assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf-8').includes('.feedback/'));
-    assert.ok(
-      fs.existsSync(path.join(root, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
-    );
-    assert.ok(
-      fs.existsSync(path.join(root, '.opencode', 'skills', 'feedback-loop', 'SKILL.md'))
-    );
-    assert.ok(fs.existsSync(path.join(root, 'AGENTS.md')));
+    assert.ok(!fs.existsSync(path.join(root, '.claude')));
+    assert.ok(!fs.existsSync(path.join(root, '.opencode')));
+    assert.ok(!fs.existsSync(path.join(root, '.codex')));
   });
 
   test('add comment command writes a store record from command payload path', async () => {
@@ -140,4 +141,3 @@ suite('Feedback Loop Extension Host', () => {
     assert.ok(archivedResolved, 'Expected resolved comment to be archived.');
   });
 });
-

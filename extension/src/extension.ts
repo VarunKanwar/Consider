@@ -13,8 +13,7 @@ import {
 } from './store';
 import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
 import {
-  detectAgentIntegrations,
-  getDetectedIntegrationTargets,
+  SetupIntegrationInstall,
   runSetupAgentIntegration,
   SetupIntegrationTarget,
 } from './setup';
@@ -596,139 +595,385 @@ class FeedbackLoopController {
     }
   }
 
-  private async promptForGitignoreChoice(): Promise<boolean | undefined> {
-    const options: Array<{ label: string; detail: string; value: boolean }> = [
-      {
-        label: 'Add .feedback/ to .gitignore',
-        detail: 'Recommended when .feedback is inside the repository.',
-        value: true,
-      },
-      {
-        label: 'Leave .gitignore unchanged',
-        detail: 'Use this if you want to manage ignore rules manually.',
-        value: false,
-      },
-    ];
-
-    const selected = await vscode.window.showQuickPick(options, {
-      placeHolder: 'Choose whether setup should update .gitignore',
-      ignoreFocusOut: true,
-    });
-    return selected?.value;
-  }
-
-  private async promptForIntegrationTargets(
-    detectedTargets: SetupIntegrationTarget[]
-  ): Promise<SetupIntegrationTarget[] | undefined> {
-    type IntegrationMode = 'detected' | 'manual' | 'skip';
-    const modeOptions: Array<{ label: string; detail: string; value: IntegrationMode }> = [];
-
-    if (detectedTargets.length > 0) {
-      const detectedLabel = detectedTargets
-        .map((target) =>
-          target === 'claude'
-            ? 'Claude'
-            : target === 'opencode'
-              ? 'OpenCode'
-              : 'Codex'
-        )
-        .join(', ');
-      modeOptions.push({
-        label: 'Install detected integrations',
-        detail: `Detected targets: ${detectedLabel}`,
-        value: 'detected',
-      });
-    }
-
-    modeOptions.push({
-      label: 'Choose integrations manually',
-      detail: 'Pick exactly which integrations to write now.',
-      value: 'manual',
-    });
-    modeOptions.push({
-      label: 'Skip integration install for now',
-      detail: 'You can rerun setup later to add integrations.',
-      value: 'skip',
-    });
-
-    const selectedMode = await vscode.window.showQuickPick(modeOptions, {
-      placeHolder: 'Choose agent integration setup behavior',
-      ignoreFocusOut: true,
-    });
-    if (!selectedMode) {
-      return undefined;
-    }
-    if (selectedMode.value === 'skip') {
-      return [];
-    }
-    if (selectedMode.value === 'detected') {
-      return detectedTargets;
-    }
-
-    const manualOptions: Array<{
-      label: string;
-      description: string;
-      value: SetupIntegrationTarget;
-    }> = [
-      {
-        label: 'Claude Code',
-        description: detectedTargets.includes('claude') ? 'Detected' : 'Not detected',
-        value: 'claude',
-      },
-      {
-        label: 'OpenCode',
-        description: detectedTargets.includes('opencode') ? 'Detected' : 'Not detected',
-        value: 'opencode',
-      },
-      {
-        label: 'Codex (AGENTS.md section)',
-        description: detectedTargets.includes('codex') ? 'Detected' : 'Not detected',
-        value: 'codex',
-      },
-    ];
-
-    const selectedTargets = await vscode.window.showQuickPick(manualOptions, {
-      canPickMany: true,
-      placeHolder: 'Select integrations to install now',
-      ignoreFocusOut: true,
-    });
-    if (selectedTargets === undefined) {
-      return undefined;
-    }
-    return selectedTargets.map((target) => target.value);
+  private integrationTargetLabel(target: SetupIntegrationTarget): string {
+    return target === 'claude'
+      ? 'Claude'
+      : target === 'opencode'
+        ? 'OpenCode'
+        : 'Codex';
   }
 
   private formatIntegrationTargets(targets: SetupIntegrationTarget[]): string {
-    return targets
-      .map((target) =>
-        target === 'claude'
-          ? 'Claude'
-          : target === 'opencode'
-            ? 'OpenCode'
-            : 'Codex'
-      )
+    return targets.map((target) => this.integrationTargetLabel(target)).join(', ');
+  }
+
+  private integrationScopePath(
+    target: SetupIntegrationTarget,
+    scope: 'project' | 'home'
+  ): string {
+    const projectPath = target === 'claude'
+      ? '.claude/skills/feedback-loop/SKILL.md'
+      : target === 'opencode'
+        ? '.opencode/skills/feedback-loop/SKILL.md'
+        : '.codex/skills/feedback-loop/SKILL.md';
+    const homePath = target === 'claude'
+      ? '~/.claude/skills/feedback-loop/SKILL.md'
+      : target === 'opencode'
+        ? '~/.opencode/skills/feedback-loop/SKILL.md'
+        : '~/.codex/skills/feedback-loop/SKILL.md';
+    return scope === 'home' ? homePath : projectPath;
+  }
+
+  private formatIntegrationInstalls(
+    installs: SetupIntegrationInstall[]
+  ): string {
+    return installs
+      .map((install) => {
+        const scopeLabel = install.scope === 'home' ? 'home' : 'workspace';
+        return `${this.integrationTargetLabel(install.target)} (${scopeLabel})`;
+      })
       .join(', ');
+  }
+
+  private async promptForSetupPlan(): Promise<
+    { addGitignoreEntry: boolean; integrationInstalls: SetupIntegrationInstall[] } | undefined
+  > {
+    const targets: SetupIntegrationTarget[] = ['claude', 'opencode', 'codex'];
+    const items = targets.map((target) => ({
+      target,
+      label: this.integrationTargetLabel(target),
+      projectPath: this.integrationScopePath(target, 'project'),
+      homePath: this.integrationScopePath(target, 'home'),
+    }));
+
+    const nonce = Math.random().toString(36).slice(2, 12);
+    const itemsJson = JSON.stringify(items);
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';"
+  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Feedback Loop Agent Skills</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+    body {
+      font-family: var(--vscode-font-family);
+      color: var(--vscode-foreground);
+      background: var(--vscode-editor-background);
+      margin: 0;
+      padding: 16px;
+    }
+    h1 {
+      font-size: 15px;
+      margin: 0 0 12px;
+      font-weight: 600;
+    }
+    p {
+      margin: 0 0 12px;
+      color: var(--vscode-descriptionForeground);
+      font-size: 12px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin: 14px 0 8px;
+      color: var(--vscode-descriptionForeground);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    .setting {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid var(--vscode-editorWidget-border);
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 8px;
+      background: var(--vscode-editorWidget-background);
+    }
+    .title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .path {
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      word-break: break-all;
+    }
+    .scope-wrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--vscode-descriptionForeground);
+      min-width: 170px;
+      justify-content: flex-end;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 42px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: var(--vscode-input-background);
+      border: 1px solid var(--vscode-input-border);
+      border-radius: 999px;
+      transition: 0.15s;
+    }
+    .slider::before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 2px;
+      top: 2px;
+      background-color: var(--vscode-foreground);
+      border-radius: 50%;
+      transition: 0.15s;
+    }
+    .switch input:checked + .slider::before {
+      transform: translateX(20px);
+    }
+    .switch input:checked + .slider {
+      background-color: var(--vscode-button-background);
+      border-color: var(--vscode-button-background);
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    button {
+      border: 1px solid var(--vscode-button-border, transparent);
+      background: var(--vscode-button-background);
+      color: var(--vscode-button-foreground);
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    button.secondary {
+      background: var(--vscode-button-secondaryBackground);
+      color: var(--vscode-button-secondaryForeground);
+    }
+    button:hover {
+      background: var(--vscode-button-hoverBackground);
+    }
+  </style>
+</head>
+<body>
+  <h1>Feedback Setup</h1>
+  <p>Configure workspace files and optional agent skills in one step.</p>
+  <div class="section-title">Project Settings</div>
+  <label class="setting">
+    <input type="checkbox" id="gitignore" checked />
+    <span>Add <code>.feedback/</code> to <code>.gitignore</code></span>
+  </label>
+  <div class="section-title">Agent Skills</div>
+  <p>Select agents to install and set each scope with the switch (Workspace or Home).</p>
+  <div id="rows"></div>
+  <div class="actions">
+    <button class="secondary" id="cancel">Cancel</button>
+    <button id="submit">Continue</button>
+  </div>
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    const items = ${itemsJson};
+
+    const rows = document.getElementById('rows');
+    for (const item of items) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'row';
+
+      const enabled = document.createElement('input');
+      enabled.type = 'checkbox';
+      enabled.id = \`enabled-\${item.target}\`;
+
+      const middle = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'title';
+      title.textContent = item.label;
+      const path = document.createElement('div');
+      path.className = 'path';
+      path.id = \`path-\${item.target}\`;
+      path.textContent = item.projectPath;
+      middle.appendChild(title);
+      middle.appendChild(path);
+
+      const right = document.createElement('div');
+      right.className = 'scope-wrap';
+      const leftLabel = document.createElement('span');
+      leftLabel.textContent = 'Workspace';
+      const switchLabel = document.createElement('label');
+      switchLabel.className = 'switch';
+      const scope = document.createElement('input');
+      scope.type = 'checkbox';
+      scope.id = \`scope-\${item.target}\`;
+      const slider = document.createElement('span');
+      slider.className = 'slider';
+      switchLabel.appendChild(scope);
+      switchLabel.appendChild(slider);
+      const rightLabel = document.createElement('span');
+      rightLabel.textContent = 'Home';
+
+      right.appendChild(leftLabel);
+      right.appendChild(switchLabel);
+      right.appendChild(rightLabel);
+
+      const setScopeEnabled = () => {
+        const isEnabled = enabled.checked;
+        scope.disabled = !isEnabled;
+        right.style.opacity = isEnabled ? '1' : '0.65';
+      };
+      const refreshPath = () => {
+        const home = scope.checked;
+        path.textContent = home ? item.homePath : item.projectPath;
+      };
+      enabled.addEventListener('change', setScopeEnabled);
+      scope.addEventListener('change', refreshPath);
+      setScopeEnabled();
+      refreshPath();
+
+      wrapper.appendChild(enabled);
+      wrapper.appendChild(middle);
+      wrapper.appendChild(right);
+      rows.appendChild(wrapper);
+    }
+
+    document.getElementById('submit').addEventListener('click', () => {
+      const installs = [];
+      for (const item of items) {
+        const enabled = document.getElementById(\`enabled-\${item.target}\`);
+        const scope = document.getElementById(\`scope-\${item.target}\`);
+        if (!enabled.checked) continue;
+        installs.push({
+          target: item.target,
+          scope: scope.checked ? 'home' : 'project',
+        });
+      }
+      const addGitignoreEntry = document.getElementById('gitignore').checked;
+      vscode.postMessage({ type: 'submit', installs, addGitignoreEntry });
+    });
+
+    document.getElementById('cancel').addEventListener('click', () => {
+      vscode.postMessage({ type: 'cancel' });
+    });
+  </script>
+</body>
+</html>`;
+
+    return await new Promise<
+      { addGitignoreEntry: boolean; integrationInstalls: SetupIntegrationInstall[] } | undefined
+    >((resolve) => {
+      const panel = vscode.window.createWebviewPanel(
+        'feedbackLoop.setupIntegrations',
+        'Feedback: Setup',
+        vscode.ViewColumn.Active,
+        {
+          enableScripts: true,
+        }
+      );
+      panel.webview.html = html;
+
+      let done = false;
+      const finish = (
+        value:
+          | { addGitignoreEntry: boolean; integrationInstalls: SetupIntegrationInstall[] }
+          | undefined
+      ): void => {
+        if (done) {
+          return;
+        }
+        done = true;
+        panel.dispose();
+        resolve(value);
+      };
+
+      panel.webview.onDidReceiveMessage((message) => {
+        if (
+          message &&
+          message.type === 'submit' &&
+          Array.isArray(message.installs) &&
+          typeof message.addGitignoreEntry === 'boolean'
+        ) {
+          const installs: SetupIntegrationInstall[] = [];
+          for (const install of message.installs) {
+            if (
+              install &&
+              (install.target === 'claude' ||
+                install.target === 'opencode' ||
+                install.target === 'codex') &&
+              (install.scope === 'project' || install.scope === 'home')
+            ) {
+              installs.push({ target: install.target, scope: install.scope });
+            }
+          }
+          finish({
+            addGitignoreEntry: message.addGitignoreEntry,
+            integrationInstalls: installs,
+          });
+          return;
+        }
+        finish(undefined);
+      });
+
+      panel.onDidDispose(() => {
+        finish(undefined);
+      });
+    });
   }
 
   private async handleSetupAgentIntegration(): Promise<void> {
     try {
-      const addGitignoreEntry = await this.promptForGitignoreChoice();
-      if (addGitignoreEntry === undefined) {
+      if (this.context.extensionMode === vscode.ExtensionMode.Test) {
+        const result = runSetupAgentIntegration(this.projectRoot, {
+          cliSourceDir: path.resolve(this.context.extensionPath, '..', 'cli'),
+          addGitignoreEntry: true,
+          integrationTargets: [],
+        });
+        void result;
         return;
       }
 
-      const detection = detectAgentIntegrations(this.projectRoot);
-      const integrationTargets = await this.promptForIntegrationTargets(
-        getDetectedIntegrationTargets(detection)
-      );
-      if (integrationTargets === undefined) {
+      const setupPlan = await this.promptForSetupPlan();
+      if (setupPlan === undefined) {
         return;
       }
+      const { addGitignoreEntry, integrationInstalls } = setupPlan;
+
+      const integrationTargets = integrationInstalls.map((install) => install.target);
 
       const result = runSetupAgentIntegration(this.projectRoot, {
         cliSourceDir: path.resolve(this.context.extensionPath, '..', 'cli'),
         addGitignoreEntry,
         integrationTargets,
+        integrationInstalls,
       });
 
       const summary: string[] = [];
@@ -750,13 +995,15 @@ class FeedbackLoopController {
             result.integrationTargetsRequested
           )}`
         );
+        summary.push(
+          `install plan: ${this.formatIntegrationInstalls(
+            result.integrationInstallsRequested
+          )}`
+        );
         if (result.skillsWritten.length > 0) {
           summary.push(`skills written (${result.skillsWritten.length})`);
         }
-        if (result.codexSectionUpdated) {
-          summary.push('AGENTS.md updated');
-        }
-        if (result.skillsWritten.length === 0 && !result.codexSectionUpdated) {
+        if (result.skillsWritten.length === 0) {
           summary.push('selected integrations already up to date');
         }
       }
