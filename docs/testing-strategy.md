@@ -50,7 +50,7 @@ This strategy is formalized as **Phase 6: Testing hardening** in the project bui
 - file-watcher rendering for agent replies
 - Required whenever a change touches extension interaction/UI behavior.
 
-### Layer 4: Extension Host integration tests (automated, release/nightly)
+### Layer 4: Extension Host integration tests (automated, required in CI)
 
 - Location: `extension/test/`
 - Harness: `@vscode/test-electron` + Mocha
@@ -60,6 +60,12 @@ This strategy is formalized as **Phase 6: Testing hardening** in the project bui
   - archive-resolved command workflow
 - Run with:
   - `npm run test:extension:host`
+
+Isolation policy:
+
+1. Host tests run against a temporary copy of `extension/test/fixtures/workspace/` (never against tracked fixture files directly).
+2. Host tests use temporary VS Code `--user-data-dir` and `--extensions-dir` paths per run.
+3. Temporary host-test directories are cleaned up after each run.
 
 Notes:
 
@@ -75,7 +81,7 @@ Notes:
 
 Before merging:
 
-1. Required GitHub status check `CI / fast-tests` must pass.
+1. Required GitHub status checks `CI / fast-tests` and `CI / host-integration` must pass.
 2. `npm test` must pass locally before opening/updating PR.
 3. If extension UX behavior changed, execute relevant checks in `docs/manual-testing.md`.
 4. Update `docs/progress.md` for phase-level changes and testing evidence.
@@ -85,7 +91,7 @@ Before merging:
 Protect `main` with:
 
 1. Require a pull request before merging.
-2. Require status checks to pass before merging: `CI / fast-tests`.
+2. Require status checks to pass before merging: `CI / fast-tests`, `CI / host-integration`.
 3. Require branches to be up to date before merging.
 4. Require at least one approving review.
 

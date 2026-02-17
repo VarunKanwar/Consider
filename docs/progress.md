@@ -307,6 +307,7 @@
      - `extension/test/runTest.js`
      - `extension/test/suite/index.js`
    - Added fixture workspace under `extension/test/fixtures/workspace/`.
+   - Hardened host runner to use an isolated temporary workspace copy plus temporary VS Code `user-data` and `extensions` directories per run, with cleanup on exit.
 
 2. **Command-level integration scenarios** (`extension/test/suite/extension.integration.test.js`)
    - Setup command scaffolding test.
@@ -341,8 +342,11 @@
 6. **GitHub Actions PR/merge check workflows**
    - Added PR/main fast-suite workflow:
      - `.github/workflows/ci.yml` (`CI / fast-tests`)
-   - Added scheduled/manual extension-host workflow:
-     - `.github/workflows/extension-host.yml` (`Extension Host / host-integration`)
+   - Added host integration job to the main CI workflow:
+     - `.github/workflows/ci.yml` (`CI / host-integration`)
+     - runs Electron host tests under `xvfb` on each push/PR.
+   - Kept manual extension-host workflow:
+     - `.github/workflows/extension-host.yml` (`Extension Host / host-integration`) via `workflow_dispatch` only.
    - Updated testing policy docs to pin merge gate status-check name and branch-protection expectations.
 
 ### What was tested
@@ -350,16 +354,16 @@
 - `npm run compile`
 - `npm run test:extension`
 - `npm test`
-- `npm run test:extension:host` was executed in this environment and failed at VS Code test-build download with DNS/network resolution error:
-  - `getaddrinfo ENOTFOUND update.code.visualstudio.com`
+- `npm run test:extension:host`
 - Attempted to apply `main` branch protection via GitHub API for required status checks and PR reviews; API returned repository plan/visibility restriction (`HTTP 403`).
 
 ### Implementation decisions not in the spec
 
-- **Host tests are a separate tier:** retained `npm test` as the fast deterministic gate; host integration tests run via dedicated script for release/nightly validation.
+- **Host tests are a required CI tier:** retained `npm test` as the fast deterministic gate and added host integration checks as a separate required CI job (`CI / host-integration`) on each push/PR.
 - **Mocha retained for host harness:** used standard VS Code extension-host test pattern (Mocha + `@vscode/test-electron`) while keeping existing Node test runner for non-host suites.
 - **Language split policy documented:** extension runtime + fast tests are TypeScript; CLI/shared runtime and extension-host harness remain JavaScript for C5 compliance and lower harness friction.
-- **CI check naming made explicit:** workflow/job naming intentionally fixed to `CI / fast-tests` for stable branch-protection targeting.
+- **CI check naming made explicit:** workflow/job naming intentionally fixed to `CI / fast-tests` and `CI / host-integration` for stable branch-protection targeting.
+- **Fixture immutability policy:** host tests must run against temp-copied workspaces so tracked fixture files never receive incidental mutations.
 
 ### What's known to be incomplete
 
