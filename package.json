@@ -7,6 +7,8 @@
     "test": "npm run test:cli && npm run test:extension",
     "test:cli": "node --test test/cli/*.test.js",
     "test:extension": "npm run compile && node --test test/extension/*.test.js",
+    "test:extension:host": "cd extension && npm run test:host",
+    "test:full": "npm test && npm run test:extension:host",
     "compile": "cd extension && npm run compile"
   }
 }

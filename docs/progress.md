@@ -294,3 +294,55 @@
 - **Phase 6 items remain:** VS Code Extension Host integration-test harness and command-level end-to-end automation.
 - **Advanced stale/orphan UX remains basic:** no dedicated interactive “re-anchor this stale comment” flow yet.
 - **Skill lifecycle management remains basic:** setup can be rerun manually; extension update-time skill version checks are not yet implemented.
+
+---
+
+## Phase 6: Testing Hardening
+
+**Status:** Complete
+
+### What was built
+
+1. **Extension Host integration test harness** (`extension/test/`)
+   - Added `@vscode/test-electron` based runner:
+     - `extension/test/runTest.js`
+     - `extension/test/suite/index.js`
+   - Added fixture workspace under `extension/test/fixtures/workspace/`.
+
+2. **Command-level integration scenarios** (`extension/test/suite/extension.integration.test.js`)
+   - Setup command scaffolding test.
+   - Add-comment command payload-path test.
+   - Archive-resolved workflow test.
+
+3. **Scripted test tiers**
+   - Root scripts (`package.json`):
+     - `npm run test:extension:host`
+     - `npm run test:full` (fast suite + host integration suite)
+   - Extension script (`extension/package.json`):
+     - `npm run test:host`
+
+4. **Testing policy documentation updates**
+   - Added/updated `docs/testing-strategy.md` with:
+     - test layer definitions,
+     - PR vs release/nightly gates,
+     - host-test network caveat and remaining gaps.
+   - Updated `AGENTS.md` build/test command reference to include host/full test commands.
+
+### What was tested
+
+- `npm run compile`
+- `npm run test:extension`
+- `npm test`
+- `npm run test:extension:host` was executed in this environment and failed at VS Code test-build download with DNS/network resolution error:
+  - `getaddrinfo ENOTFOUND update.code.visualstudio.com`
+
+### Implementation decisions not in the spec
+
+- **Host tests are a separate tier:** retained `npm test` as the fast deterministic gate; host integration tests run via dedicated script for release/nightly validation.
+- **Mocha retained for host harness:** used standard VS Code extension-host test pattern (Mocha + `@vscode/test-electron`) while keeping existing Node test runner for non-host suites.
+
+### What's known to be incomplete
+
+- **Host test execution depends on network access:** first run requires downloading VS Code test binaries from Microsoft update servers.
+- **Host scenarios should expand further:** watcher-driven reply rendering and reconciliation edit-path assertions are not yet covered in host suite.
+- **Click-level UI automation is still separate:** no full mouse-driven UI automation suite is part of PR gating.

@@ -87,6 +87,8 @@ node cli/feedback-cli.js --help
 npm test                        # Run all tests
 npm run test:cli                # CLI tests only
 npm run test:extension          # Extension tests only
+npm run test:extension:host     # Extension Host integration tests (Phase 6)
+npm run test:full               # Fast suite + Extension Host integration suite
 ```
 
 Set up these npm scripts during Phase 1/2 scaffolding. Adjust as needed but keep the top-level `npm test` working at all times.

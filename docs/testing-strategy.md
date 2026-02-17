@@ -41,22 +41,29 @@ This strategy is formalized as **Phase 6: Testing hardening** in the project bui
 - Scope:
   - comment affordances and thread interactions
   - setup command outcomes
-  - file-watcher rendering for agent replies
+- file-watcher rendering for agent replies
 - Required whenever a change touches extension interaction/UI behavior.
 
-## Gap and Planned Addition
+### Layer 4: Extension Host integration tests (automated, release/nightly)
 
-We do **not** yet have a VS Code Extension Host integration-test harness (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end automation inside a real Extension Development Host.
+- Location: `extension/test/`
+- Harness: `@vscode/test-electron` + Mocha
+- Scope:
+  - setup command scaffolding in fixture workspace
+  - add-comment command payload path
+  - archive-resolved command workflow
+- Run with:
+  - `npm run test:extension:host`
 
-Planned addition:
+Notes:
 
-1. Add extension-host test runner scaffolding under `extension/`.
-2. Add automated scenarios for:
-   - setup command full run in fixture workspace,
-   - add comment via command path,
-   - CLI reply reflected in extension state via store watcher,
-   - reconcile behavior after fixture edits.
-3. Keep UI click-level automation as optional/nightly smoke tests, not PR gating.
+1. First run may download a VS Code test build from `update.code.visualstudio.com`.
+2. In offline environments this suite may fail to launch even if test code is correct.
+
+## Remaining Gaps
+
+1. Click-level UI automation (mouse interactions) is still not part of PR gating.
+2. Extension Host scenarios should expand to include watcher-driven reply rendering and reconciliation edit-path assertions.
 
 ## Merge Gate
 
@@ -77,3 +84,4 @@ Before a release candidate:
    - add comment,
    - CLI list/context/reply/resolve,
    - extension renders updates.
+4. Run `npm run test:extension:host` in a network-enabled environment.
