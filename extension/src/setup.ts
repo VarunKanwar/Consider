@@ -505,21 +505,6 @@ function copyCli(
   return copied;
 }
 
-function removeDirIfEmpty(dirPath: string): boolean {
-  if (!fs.existsSync(dirPath)) {
-    return false;
-  }
-  const stat = fs.statSync(dirPath);
-  if (!stat.isDirectory()) {
-    return false;
-  }
-  if (fs.readdirSync(dirPath).length > 0) {
-    return false;
-  }
-  fs.rmdirSync(dirPath);
-  return true;
-}
-
 function removeTrackedSkillInstall(install: SetupTrackedSkillInstall): boolean {
   const skillPath = path.normalize(install.path);
   if (!fs.existsSync(skillPath)) {
@@ -528,11 +513,6 @@ function removeTrackedSkillInstall(install: SetupTrackedSkillInstall): boolean {
 
   const skillDir = path.dirname(skillPath);
   fs.rmSync(skillDir, { recursive: true, force: true });
-
-  const skillsDir = path.dirname(skillDir);
-  const agentRootDir = path.dirname(skillsDir);
-  removeDirIfEmpty(skillsDir);
-  removeDirIfEmpty(agentRootDir);
   return true;
 }
 

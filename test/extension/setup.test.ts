@@ -354,7 +354,11 @@ describe('setup agent integration', () => {
     assert.equal(result.skillsRemoved.length, 2);
     assert.ok(!fs.existsSync(path.join(projectRoot, '.feedback')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.claude')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.claude', 'skills')));
     assert.ok(!fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop')));
+    assert.ok(fs.existsSync(path.join(controlledHome, '.opencode')));
+    assert.ok(fs.existsSync(path.join(controlledHome, '.opencode', 'skills')));
     assert.equal(read('.gitignore', projectRoot).includes('.feedback/'), false);
   });
 
@@ -373,6 +377,8 @@ describe('setup agent integration', () => {
     assert.equal(result.gitignoreSkipped, true);
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'store.json')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.codex')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.codex', 'skills')));
     const config = readJson('.feedback/config.json', projectRoot);
     assert.deepEqual(config.trackedSkillInstalls, []);
   });

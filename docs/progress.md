@@ -506,7 +506,7 @@
 
 1. **Config path ownership:** uninstall tracking state is stored in `.feedback/config.json` (same gitignored root as store/runtime files).
 2. **Fallback compatibility:** uninstall attempts fallback detection for known skill paths when tracking metadata is missing, to support older installs.
-3. **Safety scope:** uninstall removes only tracked Feedback Loop skill directories and prunes parent skill folders only when empty.
+3. **Safety scope:** uninstall removes only tracked Feedback Loop skill directories (`.../skills/feedback-loop`) and leaves agent root directories in place.
 
 ### What's known to be incomplete
 

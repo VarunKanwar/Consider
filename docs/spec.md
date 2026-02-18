@@ -459,6 +459,7 @@ When the developer runs "Feedback: Uninstall":
    - skills-only uninstall (keep `.feedback/` data).
 2. Read tracked skill installs from `.feedback/config.json`.
 3. Remove tracked skill files/folders for the selected uninstall mode.
+   - Limit deletion scope to the Feedback Loop skill package directory (`.../skills/feedback-loop`) rather than deleting agent root directories.
    - If skills-only uninstall is selected, clear removed skill entries from `.feedback/config.json`.
 4. If no tracking data exists (older installs), fall back to discovering Feedback Loop skill files in known locations and remove those.
 5. Remove `.feedback/` when full uninstall is selected.

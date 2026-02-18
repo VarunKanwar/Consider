@@ -30,6 +30,9 @@ const AGENT_AUTHOR: vscode.CommentAuthorInformation = {
   name: 'Agent',
 };
 
+const FULL_LINE_END_CHARACTER = Number.MAX_SAFE_INTEGER;
+const MAX_PER_LINE_COMMENTING_RANGES = 5000;
+
 /**
  * Our custom Comment implementation that tracks the store's reply ID.
  */
@@ -207,15 +210,29 @@ class FeedbackLoopController {
 
     this.commentController = vscode.comments.createCommentController(
       'feedback-loop',
-      'Feedback Loop'
+      'Feedback Loop Annotations'
     );
     this.commentController.commentingRangeProvider = {
       provideCommentingRanges: (
         document: vscode.TextDocument,
         _token: vscode.CancellationToken
       ) => {
-        // Allow commenting on any line in any file
-        return [new vscode.Range(0, 0, document.lineCount - 1, 0)];
+        if (document.lineCount === 0) {
+          return [];
+        }
+
+        // Use one logical range per line so wrapped lines don't duplicate icons.
+        if (document.lineCount <= MAX_PER_LINE_COMMENTING_RANGES) {
+          const ranges: vscode.Range[] = [];
+          for (let line = 0; line < document.lineCount; line++) {
+            const endChar = document.lineAt(line).range.end.character;
+            ranges.push(new vscode.Range(line, 0, line, endChar));
+          }
+          return ranges;
+        }
+
+        // Fallback for very large files.
+        return [new vscode.Range(0, 0, document.lineCount - 1, FULL_LINE_END_CHARACTER)];
       },
     };
     // Set the reaction handler to null to disable reactions UI
@@ -403,7 +420,7 @@ class FeedbackLoopController {
 
     const thread = this.commentController.createCommentThread(
       editor.document.uri,
-      new vscode.Range(startLine, 0, endLine, 0),
+      this.buildDocumentLineRange(editor.document, startLine, endLine),
       []
     );
     this.createRootComment(thread, body, editor.document);
@@ -1477,11 +1494,9 @@ class FeedbackLoopController {
     this.applyThreadPresentation(thread, comment.status);
 
     // Update range if anchor changed (will matter in Phase 3)
-    const newRange = new vscode.Range(
-      comment.anchor.startLine - 1,
-      0,
-      comment.anchor.endLine - 1,
-      0
+    const newRange = this.buildStoredAnchorRange(
+      comment.anchor.startLine,
+      comment.anchor.endLine
     );
     thread.range = newRange;
   }
@@ -1506,11 +1521,9 @@ class FeedbackLoopController {
     const fileUri = vscode.Uri.file(
       path.join(this.projectRoot, comment.file)
     );
-    const range = new vscode.Range(
-      comment.anchor.startLine - 1,
-      0,
-      comment.anchor.endLine - 1,
-      0
+    const range = this.buildStoredAnchorRange(
+      comment.anchor.startLine,
+      comment.anchor.endLine
     );
 
     const thread = this.commentController.createCommentThread(
@@ -1548,6 +1561,23 @@ class FeedbackLoopController {
   }
 
   // --- Helpers ---
+
+  private buildDocumentLineRange(
+    document: vscode.TextDocument,
+    startLine: number,
+    endLine: number
+  ): vscode.Range {
+    const clampedStart = Math.max(0, Math.min(startLine, document.lineCount - 1));
+    const clampedEnd = Math.max(clampedStart, Math.min(endLine, document.lineCount - 1));
+    const endChar = document.lineAt(clampedEnd).range.end.character;
+    return new vscode.Range(clampedStart, 0, clampedEnd, endChar);
+  }
+
+  private buildStoredAnchorRange(startLine: number, endLine: number): vscode.Range {
+    const start = Math.max(0, startLine - 1);
+    const end = Math.max(start, endLine - 1);
+    return new vscode.Range(start, 0, end, FULL_LINE_END_CHARACTER);
+  }
 
   private isCommentReply(value: unknown): value is vscode.CommentReply {
     if (!value || typeof value !== 'object') {
