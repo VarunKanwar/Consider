@@ -68,6 +68,7 @@ interface FeedbackFileNode {
 interface FeedbackCommentNode {
   kind: 'comment';
   comment: FeedbackComment;
+  nodeId: string;
 }
 
 type FeedbackTreeNode = FeedbackFileNode | FeedbackCommentNode;
@@ -94,16 +95,21 @@ class FeedbackCommentsTreeProvider
 
   private comments: FeedbackComment[] = [];
   private statusFilter: CommentStatusFilter = 'all';
+  private fileNodes: FeedbackFileNode[] = [];
+  private commentNodesById: Map<string, FeedbackCommentNode> = new Map();
+  private nodeSequence = 0;
 
   constructor(private projectRoot: string) {}
 
   setStore(store: FeedbackStore): void {
     this.comments = store.comments.slice();
+    this.rebuildNodes();
     this.refresh();
   }
 
   setStatusFilter(statusFilter: CommentStatusFilter): void {
     this.statusFilter = statusFilter;
+    this.rebuildNodes();
     this.refresh();
   }
 
@@ -136,6 +142,7 @@ class FeedbackCommentsTreeProvider
       `${formatCommentLineRange(comment)} ${truncateTreeText(comment.body, 72)}`,
       vscode.TreeItemCollapsibleState.None
     );
+    item.id = element.nodeId;
     item.description = `${comment.status} • ${comment.id}`;
     item.tooltip = `${comment.file}:${comment.anchor.startLine}\n\n${comment.body}`;
     item.iconPath = comment.status === 'resolved'
@@ -156,25 +163,43 @@ class FeedbackCommentsTreeProvider
 
   getChildren(element?: FeedbackTreeNode): FeedbackTreeNode[] {
     if (!element) {
-      return groupCommentsByFile(this.comments, this.statusFilter).map(
-        (group) =>
-          ({
-            kind: 'file',
-            file: group.file,
-            comments: group.comments,
-          }) satisfies FeedbackFileNode
-      );
+      return this.fileNodes;
     }
     if (element.kind === 'file') {
-      return element.comments.map(
-        (comment) =>
-          ({
-            kind: 'comment',
-            comment,
-          }) satisfies FeedbackCommentNode
-      );
+      const children: FeedbackCommentNode[] = [];
+      for (const comment of element.comments) {
+        const node = this.commentNodesById.get(comment.id);
+        if (node) {
+          children.push(node);
+        }
+      }
+      return children;
     }
     return [];
+  }
+
+  private rebuildNodes(): void {
+    const grouped = groupCommentsByFile(this.comments, this.statusFilter);
+    this.fileNodes = grouped.map(
+      (group) =>
+        ({
+          kind: 'file',
+          file: group.file,
+          comments: group.comments,
+        }) satisfies FeedbackFileNode
+    );
+    this.commentNodesById.clear();
+
+    for (const fileNode of this.fileNodes) {
+      for (const comment of fileNode.comments) {
+        const commentNode = {
+          kind: 'comment',
+          comment,
+          nodeId: `feedback-comment-node-${comment.id}-${++this.nodeSequence}`,
+        } satisfies FeedbackCommentNode;
+        this.commentNodesById.set(comment.id, commentNode);
+      }
+    }
   }
 }
 
@@ -221,8 +246,7 @@ class FeedbackLoopController {
     };
     // Set the reaction handler to null to disable reactions UI
     this.commentController.options = {
-      prompt: 'Write feedback for the agent...',
-      placeHolder: 'Type your feedback here',
+      prompt: '',
     };
     this.disposables.push(this.commentController);
     this.disposables.push(this.commentsTreeView);
@@ -347,6 +371,14 @@ class FeedbackLoopController {
         }
       )
     );
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        'feedback-loop.toggleCommentThreadFromTree',
+        (arg?: unknown) => {
+          this.handleToggleCommentThreadFromTree(arg);
+        }
+      )
+    );
 
     // Reconcile All
     this.disposables.push(
@@ -408,8 +440,8 @@ class FeedbackLoopController {
     }
 
     const body = await vscode.window.showInputBox({
-      prompt: 'Write feedback for the agent...',
-      placeHolder: 'Type your feedback here',
+      prompt: '',
+      placeHolder: '',
       ignoreFocusOut: true,
       validateInput: (value) => {
         return value.trim().length === 0 ? 'Feedback cannot be empty.' : null;
@@ -1241,6 +1273,17 @@ class FeedbackLoopController {
       targetRange,
       vscode.TextEditorRevealType.InCenterIfOutsideViewport
     );
+
+    this.applyTreeThreadState(commentId, true);
+  }
+
+  private handleToggleCommentThreadFromTree(arg?: unknown): void {
+    const commentId = this.getCommentIdFromTreeCommandArg(arg);
+    if (!commentId) {
+      vscode.window.showWarningMessage('Could not identify a comment thread to toggle.');
+      return;
+    }
+    this.toggleSingleThreadCollapse(commentId);
   }
 
   private handleReconcileAll(): void {
@@ -1598,6 +1641,68 @@ class FeedbackLoopController {
     return new vscode.Range(start, 0, end, 0);
   }
 
+  private applyTreeThreadState(commentId: string, shouldExpand: boolean): void {
+    const targetThread = this.threadMap.get(commentId);
+    if (!targetThread) {
+      return;
+    }
+
+    if (!shouldExpand) {
+      targetThread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
+      return;
+    }
+
+    // Keep tree navigation deterministic: selecting a comment opens only that
+    // thread and collapses the rest.
+    for (const [id, thread] of this.threadMap) {
+      if (id === commentId) continue;
+      thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
+    }
+
+    targetThread.collapsibleState = vscode.CommentThreadCollapsibleState.Expanded;
+  }
+
+  private toggleSingleThreadCollapse(commentId: string): void {
+    const thread = this.threadMap.get(commentId);
+    if (!thread) {
+      return;
+    }
+    this.toggleThreadCollapse(thread);
+  }
+
+  private toggleThreadCollapse(thread: vscode.CommentThread): void {
+    const isExpanded =
+      thread.collapsibleState === vscode.CommentThreadCollapsibleState.Expanded;
+    thread.collapsibleState = isExpanded
+      ? vscode.CommentThreadCollapsibleState.Collapsed
+      : vscode.CommentThreadCollapsibleState.Expanded;
+  }
+
+  private getCommentIdFromTreeCommandArg(arg?: unknown): string | undefined {
+    if (typeof arg === 'string') {
+      return arg;
+    }
+    if (!arg || typeof arg !== 'object') {
+      return undefined;
+    }
+    const candidate = arg as {
+      kind?: unknown;
+      comment?: { id?: unknown };
+      commentId?: unknown;
+    };
+    if (typeof candidate.commentId === 'string') {
+      return candidate.commentId;
+    }
+    if (
+      candidate.kind === 'comment' &&
+      candidate.comment &&
+      typeof candidate.comment.id === 'string'
+    ) {
+      return candidate.comment.id;
+    }
+    return undefined;
+  }
+
   private isCommentReply(value: unknown): value is vscode.CommentReply {
     if (!value || typeof value !== 'object') {
       return false;
@@ -1683,6 +1788,7 @@ export function activate(context: vscode.ExtensionContext): void {
       'feedback-loop.showAllComments',
       'feedback-loop.archiveResolved',
       'feedback-loop.reconcileAll',
+      'feedback-loop.toggleCommentThreadFromTree',
     ];
     for (const cmd of cmds) {
       context.subscriptions.push(

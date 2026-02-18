@@ -50,7 +50,8 @@ function commentBodyToString(comment) {
 async function waitFor(predicate, description, timeoutMs = 5000, intervalMs = 50) {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
-    if (predicate()) {
+    const matched = await Promise.resolve(predicate());
+    if (matched) {
       return;
     }
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
@@ -260,6 +261,110 @@ suite('Feedback Loop Extension Host', () => {
     assert.ok(comment, 'Expected comment after reopen command.');
     assert.equal(comment.status, 'open');
     assert.equal(thread.state, vscode.CommentThreadState.Unresolved);
+  });
+
+  test('tree comment selection opens and expands only the selected thread', async () => {
+    const root = workspaceRoot();
+    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+
+    const first = await addCommentViaPayload(
+      root,
+      'Tree toggle first comment',
+      controllers
+    );
+    const second = await addCommentViaPayload(
+      root,
+      'Tree toggle second comment',
+      controllers
+    );
+
+    assert.equal(
+      first.thread.collapsibleState,
+      vscode.CommentThreadCollapsibleState.Collapsed
+    );
+    assert.equal(
+      second.thread.collapsibleState,
+      vscode.CommentThreadCollapsibleState.Collapsed
+    );
+
+    await vscode.commands.executeCommand(
+      'feedback-loop.openCommentFromTree',
+      first.commentId
+    );
+    await waitFor(
+      () =>
+        first.thread.collapsibleState === vscode.CommentThreadCollapsibleState.Expanded,
+      'first thread to expand from tree selection'
+    );
+    assert.equal(
+      second.thread.collapsibleState,
+      vscode.CommentThreadCollapsibleState.Collapsed
+    );
+
+    await vscode.commands.executeCommand(
+      'feedback-loop.openCommentFromTree',
+      first.commentId
+    );
+    await waitFor(
+      () =>
+        first.thread.collapsibleState === vscode.CommentThreadCollapsibleState.Expanded,
+      'first thread to remain stable after second tree selection'
+    );
+  });
+
+  test('tree inline toggle command collapses and expands a single thread', async () => {
+    const root = workspaceRoot();
+    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+
+    const first = await addCommentViaPayload(
+      root,
+      'Tree inline toggle first comment',
+      controllers
+    );
+    const second = await addCommentViaPayload(
+      root,
+      'Tree inline toggle second comment',
+      controllers
+    );
+
+    await vscode.commands.executeCommand('feedback-loop.openCommentFromTree', first.commentId);
+    await waitFor(
+      () =>
+        first.thread.collapsibleState === vscode.CommentThreadCollapsibleState.Expanded,
+      'first thread to be expanded before toggle'
+    );
+    assert.equal(
+      second.thread.collapsibleState,
+      vscode.CommentThreadCollapsibleState.Collapsed
+    );
+
+    await vscode.commands.executeCommand('feedback-loop.toggleCommentThreadFromTree', {
+      kind: 'comment',
+      comment: { id: first.commentId },
+    });
+    await waitFor(
+      () =>
+        first.thread.collapsibleState === vscode.CommentThreadCollapsibleState.Collapsed,
+      'first thread to collapse from inline toggle'
+    );
+    assert.equal(
+      second.thread.collapsibleState,
+      vscode.CommentThreadCollapsibleState.Collapsed
+    );
+
+    await vscode.commands.executeCommand('feedback-loop.toggleCommentThreadFromTree', {
+      kind: 'comment',
+      comment: { id: first.commentId },
+    });
+    await waitFor(
+      () =>
+        first.thread.collapsibleState === vscode.CommentThreadCollapsibleState.Expanded,
+      'first thread to expand from inline toggle'
+    );
+    assert.equal(
+      second.thread.collapsibleState,
+      vscode.CommentThreadCollapsibleState.Collapsed
+    );
   });
 
   test('supports skills-only and full uninstall paths', async () => {

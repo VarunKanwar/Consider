@@ -51,7 +51,7 @@
 2. Preferred path: hover over the glyph margin (left of line numbers) on any line — you should see a `+` icon appear.
 3. Click the `+` icon to create a new comment thread.
 4. Type a comment (e.g., "This function should handle errors") and click the submit button (checkmark or press Cmd+Enter).
-5. Alternate path: run **Feedback: Add Comment** from Command Palette and enter the comment in the prompt.
+5. Alternate path: run **Add Comment** from Command Palette and enter the comment in the prompt.
 6. **Expected:**
    - The comment appears inline next to the line.
    - Author shows as "Developer".
@@ -137,6 +137,7 @@ This is the key test for the file watcher.
    - Comments are grouped by file.
    - Comment rows show status and comment ID in the description.
    - Selecting a comment row opens the target file and reveals the anchor line.
+   - Each comment row has an inline toggle action (collapse icon) that collapses/expands only that comment thread.
    - Filter choice updates visible comments by status.
 
 ## Test 12: Archive Resolved

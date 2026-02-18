@@ -259,7 +259,7 @@ This gives us the PR review UX essentially for free. The extension's job is to w
 
 The extension should register the following commands:
 
-**Feedback: Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with status `open`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
+**Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with status `open`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
 
 **Feedback: Setup Agent Integration** — Runs a guided setup flow: initializes `.feedback/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
 
