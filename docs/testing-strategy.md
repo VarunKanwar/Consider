@@ -107,6 +107,6 @@ Before a release candidate:
 3. Validate full loop in a clean workspace:
    - setup,
    - add comment,
-   - CLI list/context/reply/resolve,
+   - CLI list/context/reply/resolve/unresolve (including workflow+anchor filters),
    - extension renders updates.
 4. Run `npm run test:extension:host` in a network-enabled environment.

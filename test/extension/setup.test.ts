@@ -243,7 +243,7 @@ describe('setup agent integration', () => {
     assertHasSkillFrontmatter(codexSkill);
     assert.ok(
       codexSkill.includes(
-        'If a comment is informational or preference-only (no explicit change request), prefer a thread reply without making code edits.'
+        'Do not edit code unless there is a clear, explicit instruction to change code (in the thread or main chat).'
       )
     );
   });

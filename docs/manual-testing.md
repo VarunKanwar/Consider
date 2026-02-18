@@ -56,7 +56,7 @@
    - The comment appears inline next to the line.
    - Author shows as "Developer".
    - `.feedback/store.json` now contains the comment with correct file path, line numbers, and body text.
-   - The comment has status `"open"`.
+   - The comment has `"workflowState": "open"` and `"anchorState": "anchored"`.
 
 If the `+` icon never appears:
 - Ensure `"editor.glyphMargin": true` in settings.
@@ -77,14 +77,17 @@ If the `+` icon never appears:
 1. On an open comment thread, click the **Resolve** button (checkmark icon in the thread title bar).
 2. **Expected:**
    - The thread visually changes to resolved state (may appear dimmed/collapsed).
-   - The store shows `"status": "resolved"` for this comment.
+   - The thread header/status labels show resolved + anchor state indicators.
+   - Reply UI is disabled while resolved.
+   - The store shows `"workflowState": "resolved"` for this comment.
 
 ## Test 6: Reopen a Resolved Comment
 
 1. Find a resolved comment thread and click **Reopen**.
 2. **Expected:**
    - The thread returns to open/unresolved state.
-   - The store shows `"status": "open"` again.
+   - Reply UI is enabled again.
+   - The store shows `"workflowState": "open"` again.
 
 ## Test 7: Delete a Comment
 
@@ -131,14 +134,18 @@ This is the key test for the file watcher.
 
 1. Ensure you have comments across at least two files and mixed statuses.
 2. Run **Feedback: Show All Comments**.
-3. Pick a filter (e.g., **Open only**).
+3. Use the visibility checkboxes:
+   - **Show resolved**
+   - **Show stale**
 4. **Expected:**
    - Explorer shows a **Feedback Comments** view.
    - Comments are grouped by file.
-   - Comment rows show status and comment ID in the description.
+   - Comment rows show richer workflow/anchor state tags and comment ID in the description.
    - Selecting a comment row opens the target file and reveals the anchor line.
    - Each comment row has an inline toggle action (collapse icon) that collapses/expands only that comment thread.
-   - Filter choice updates visible comments by status.
+   - Checkbox state updates visible comments in both:
+     - the **Feedback Comments** tree,
+     - the built-in VS Code **COMMENTS** panel (hidden threads are removed from the panel until re-enabled).
 
 ## Test 12: Archive Resolved
 
@@ -147,7 +154,7 @@ This is the key test for the file watcher.
 3. **Expected:**
    - Resolved comments are removed from `.feedback/store.json`.
    - Archived records are appended to `.feedback/archive.json`.
-   - Open/stale/orphaned comments remain in active store.
+   - Non-resolved workflow comments remain in active store (regardless of anchor state).
    - Running again with no resolved comments reports a no-op message.
 
 ## Test 13: CLI Summary Check
@@ -157,6 +164,7 @@ This is the key test for the file watcher.
    .feedback/bin/feedback-cli summary
    ```
 2. **Expected:** Shows the correct count of open comments and files.
+   - Also shows unseen-open count and workflow/anchor breakdowns.
 
 ## Test 14: Setup Idempotency
 

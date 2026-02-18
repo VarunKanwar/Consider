@@ -120,7 +120,12 @@ The directory structure:
 
 The store is a single JSON file. A single file (rather than per-file storage) simplifies querying ("show all open comments across the project") and avoids proliferating files.
 
-Comment statuses: **open** (active, awaiting attention), **resolved** (addressed, closed by either party), **stale** (target code changed substantially, anchor could not be re-established), **orphaned** (target file no longer exists).
+Comment state is split across two independent axes:
+
+- `workflowState`: `open` or `resolved` (conversation lifecycle).
+- `anchorState`: `anchored`, `stale`, or `orphaned` (location reliability).
+
+This allows combinations like "resolved + orphaned" without state clobbering.
 
 ```json
 {
@@ -138,7 +143,9 @@ Comment statuses: **open** (active, awaiting attention), **resolved** (addressed
         "contentHash": "a1b2c3d4",
         "lastAnchorCheck": "2025-02-15T10:30:00Z"
       },
-      "status": "open",
+      "workflowState": "open",
+      "anchorState": "anchored",
+      "agentLastSeenAt": "2025-02-15T10:33:00Z",
       "createdAt": "2025-02-15T10:30:00Z",
       "author": "human",
       "body": "This should return a Result type instead of throwing. We discussed this in the error handling spec.",
@@ -161,6 +168,8 @@ Comment statuses: **open** (active, awaiting attention), **resolved** (addressed
 }
 ```
 
+`agentLastSeenAt` tracks when an agent last acknowledged the thread. This supports unseen-human-activity filtering without changing workflow state.
+
 ### 4.3 Content-Based Anchoring and Reconciliation
 
 This is the hardest subproblem in the project and deserves careful attention.
@@ -172,8 +181,8 @@ This is the hardest subproblem in the project and deserves careful attention.
 1. Check if the content at the stored line number still matches `targetContent` (fast path — nothing moved).
 2. If not, search the file for the `targetContent` string. If found exactly once, update the line number.
 3. If not found exactly, use the `contextBefore`/`contextAfter` lines to do fuzzy positional matching — find the region of the file that best matches the surrounding context.
-4. If no good match is found (similarity below a threshold), mark the comment as **stale**.
-5. If the file no longer exists, mark the comment as **orphaned**.
+4. If no good match is found (similarity below a threshold), set `anchorState = stale`.
+5. If the file no longer exists, set `anchorState = orphaned`.
 
 This is the same general approach that `git merge` uses for conflict detection, and it's "good enough" — perfect tracking isn't the goal. Flagging staleness is. At the same time, common interaction patterns (agent adds lines above a comment, agent refactors the commented function) must re-anchor correctly and not produce false staleness.
 
@@ -187,7 +196,7 @@ Therefore, **both** the CLI and the extension perform reconciliation, each cover
 
 1. Reads the store.
 2. For each comment whose target file has a modification time newer than the comment's `lastAnchorCheck` timestamp, runs the re-anchoring algorithm.
-3. Updates the store with corrected line numbers and any staleness flags.
+3. Updates the store with corrected line numbers and anchor-state transitions.
 4. Returns the reconciled results.
 
 This ensures the agent always sees accurate positions, even for files that were never opened in VS Code.
@@ -204,17 +213,18 @@ If either the CLI or the extension has already reconciled (updating `lastAnchorC
 
 **Shared logic:** The re-anchoring algorithm should be identical in both the CLI and the extension. In practice, the extension is TypeScript and the CLI is a standalone Node.js script, so the implementations will be separate. However, the algorithm (content matching, context window comparison, staleness threshold) must behave the same way. Consider extracting the algorithm into a shared `.js` file that both can import, or at minimum, ensure the logic is well-specified enough that two implementations produce the same results.
 
-**File deletion:** When the CLI encounters a comment whose target file no longer exists on disk, it marks the comment as **orphaned**. Orphaned comments are still visible in listings (with an `[orphaned]` flag) but are excluded from `context` output (there's no file to show context from). The developer can dismiss orphaned comments or, if the file was renamed/moved, manually re-anchor them via the extension.
+**File deletion:** When reconciliation encounters a comment whose target file no longer exists on disk, it sets `anchorState = orphaned`. Orphaned comments are still visible in listings but are excluded from `context` output (there's no file to show context from). The developer can dismiss orphaned comments or, if the file was renamed/moved, manually re-anchor them via the extension.
 
 **Future improvement: git-based optimization.** The reconciliation could be made smarter by using `git diff --name-only` to identify which files have changed, and even using diff hunk information for mechanical line-number remapping before falling back to content-based matching. This is a v2 optimization — the content-based approach is sufficient for v1, and git-based remapping would be an acceleration, not a replacement.
 
-### 4.4 Staleness and Orphan Display
+### 4.4 Workflow vs Anchor Display
 
-Comments can be in one of four states: **open** (active, anchor is valid), **resolved** (addressed, closed by either party), **stale** (the target code has changed substantially and the anchor could not be confidently re-established), or **orphaned** (the target file no longer exists).
+The UI should render both dimensions:
 
-The extension should visually distinguish these — different icon colors, labels, or dimming. Stale and orphaned comments aren't deleted; they're flagged for human review. The developer can re-anchor stale comments manually (click to move to the right location), dismiss them, or leave them for the agent to address.
+- Workflow: `open` vs `resolved` (thread state, resolve/reopen actions).
+- Anchor: `anchored` vs `stale` vs `orphaned` (position reliability).
 
-The CLI reports these states clearly in its output so the agent can also understand which comments might be outdated.
+Stale and orphaned comments are not deleted; they are flagged for review regardless of workflow state. Resolved comments can still become stale/orphaned later if code moves or files disappear. The CLI should report both fields so agents can avoid acting on outdated anchors.
 
 ### 4.5 Setup Tracking Config
 
@@ -259,7 +269,7 @@ This gives us the PR review UX essentially for free. The extension's job is to w
 
 The extension should register the following commands:
 
-**Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with status `open`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
+**Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with `workflowState=open` and `anchorState=anchored`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
 
 **Feedback: Setup Agent Integration** — Runs a guided setup flow: initializes `.feedback/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
 
@@ -267,7 +277,7 @@ On first run in a workspace without `.feedback/store.json`, the extension should
 
 **Feedback: Uninstall** — Runs a guided offboarding flow. The developer chooses between full uninstall (remove `.feedback/` + tracked skills) or skills-only uninstall (keep `.feedback/` data). See Section 8.3.
 
-**Feedback: Show All Comments** — Opens a tree view / panel showing all feedback across the project, grouped by file, filterable by status (open/resolved/stale/orphaned).
+**Feedback: Show All Comments** — Opens a tree view / panel showing all feedback across the project, grouped by file, with visibility toggles for resolved and stale comments. These toggles should apply to both the custom Feedback tree and the built-in VS Code comments panel by controlling thread rendering.
 
 **Feedback: Archive Resolved** — Moves resolved threads out of the active store (into an archive file or deletes them) to prevent unbounded growth.
 
@@ -306,8 +316,9 @@ exec node "$(dirname "$0")/feedback-cli.cjs" "$@"
 ### 6.2 Commands
 
 ```
-feedback-cli list [--status open|resolved|stale|orphaned|all] [--file <path>]
-    List comments, optionally filtered. Default: all open comments.
+feedback-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>]
+    List comments, optionally filtered. Default: workflow=open, anchor=all.
+    Legacy alias: --status open|resolved|stale|orphaned|all.
     Output: structured text or JSON (--json flag).
 
 feedback-cli get <comment-id>
@@ -321,8 +332,12 @@ feedback-cli reply <comment-id> --message "..."
 feedback-cli resolve <comment-id>
     Mark a comment as resolved.
 
+feedback-cli unresolve <comment-id>
+    Reopen a resolved comment.
+
 feedback-cli summary
     High-level summary: N open comments across M files.
+    Also reports workflow/anchor breakdown and unseen-open count.
     Useful for the agent to quickly check if there's pending feedback.
 
 feedback-cli context <comment-id>
@@ -339,17 +354,17 @@ Default output should be human-readable structured text (suitable for an agent t
 
 Example `list` output:
 ```
-3 open comments:
+3 comments (workflow=open, anchor=all):
 
-[c_abc123] src/auth/login.ts:45-47 (open)
+[c_abc123] src/auth/login.ts:45-47 (workflow=open, anchor=anchored, unseen)
   "This should return a Result type instead of throwing."
   2 replies, last reply from: agent
 
-[c_def456] src/auth/session.ts:12 (open)
+[c_def456] src/auth/session.ts:12 (workflow=open, anchor=anchored, seen)
   "Missing null check on session object"
   0 replies
 
-[c_ghi789] README.md:30-35 (stale)
+[c_ghi789] README.md:30-35 (workflow=open, anchor=stale, unseen)
   "This section needs to be updated after the API changes"
   1 reply, last reply from: human
 ```
@@ -362,7 +377,7 @@ This section covers how feedback flows between the extension and the agent, and 
 
 ### 7.1 Comment Lifecycle
 
-Comments are `open` the moment the developer creates them. There is no draft, queue, or dispatch step. The developer does their review pass in VS Code, adding comments across files, and those comments are immediately present in the store.
+Comments are created with `workflowState=open` the moment the developer creates them. There is no draft, queue, or dispatch step. The developer does their review pass in VS Code, adding comments across files, and those comments are immediately present in the store.
 
 The developer controls when the agent sees the feedback by controlling when they tell the agent to look — either by prompting it directly in the main conversation, or by relying on the skill file's instructions for the agent to check periodically. This is simpler than a queue model and maps to how the developer already interacts with the agent.
 
@@ -370,7 +385,7 @@ The developer controls when the agent sees the feedback by controlling when they
 
 The agent discovers feedback through the CLI, prompted by the skill file or by the developer.
 
-**Skill-prompted discovery:** The skill file instructs the agent to check for pending feedback at natural workflow transition points. For example: "Before beginning implementation of a plan, run `feedback-cli summary` to check if the developer has left inline feedback. If there are open comments, run `feedback-cli list` and address them before proceeding." This makes feedback checking part of the agent's habitual workflow without requiring the developer to remember to prompt it.
+**Skill-prompted discovery:** The skill file instructs the agent to check for pending feedback at natural workflow transition points. For example: "Before beginning implementation of a plan, run `feedback-cli summary` to check if the developer has left inline feedback. If there are workflow-open comments, run `feedback-cli list` and address them before proceeding." This makes feedback checking part of the agent's habitual workflow without requiring the developer to remember to prompt it.
 
 **Developer-prompted discovery:** The developer tells the agent in the main chat: "I've left inline feedback on the auth module — check `feedback-cli list --file src/auth/` and address it." This gives the developer explicit control and allows targeting by file or scope.
 
@@ -380,7 +395,7 @@ The agent discovers feedback through the CLI, prompted by the skill file or by t
 
 The skill file should document how to filter feedback. When the developer says "check my feedback on @src/auth/login.ts" in the agent chat, the agent knows (from the skill) to run `feedback-cli list --file src/auth/login.ts`. The `@`-mention file reference syntax already exists in Claude Code and Codex, so this composes naturally with existing agent UX.
 
-The skill file should also instruct the agent on how to handle different comment states: process `open` comments and note `stale` ones (flag them to the developer rather than acting on potentially outdated feedback).
+The skill file should also instruct the agent on how to handle both state axes: process `workflow=open` comments, and treat `anchor=stale`/`anchor=orphaned` as caution states (flag before acting on possibly outdated anchors).
 
 ### 7.4 Comment Threads vs. Main Conversation
 
@@ -388,8 +403,11 @@ A comment thread is a *scoped* discussion about a specific code location. The ma
 
 - The developer uses comment threads for specific, located feedback ("this line should do X").
 - The developer uses the main conversation for high-level direction ("now implement the changes from my review").
-- The agent uses comment threads for located responses ("agreed, I'll change this") and the main conversation for broader status updates ("I've addressed all 5 feedback items, here's a summary").
-- If a thread comment is informational or preference-only (no explicit change request), the agent should prefer replying in-thread without editing code.
+- The agent should default to conversational handling first (reply/clarify) rather than immediately editing code.
+- The agent should not edit code unless there is a clear, explicit instruction to change code in either the thread or main conversation.
+- The agent should choose one primary response channel per item: thread for localized feedback, main conversation for cross-cutting decisions.
+- If escalation to the main conversation is needed, the thread should contain only a short pointer rather than a duplicate full response.
+- If a thread comment is informational or preference-only (no explicit change request), the agent should prefer a brief in-thread acknowledgement without editing code.
 - If the agent finds that the overall set of comments suggests a significant directional disagreement (not just line-level fixes), it should raise this in the main conversation rather than replying piecemeal in threads.
 
 The skill file should explain these conventions to the agent.
@@ -497,12 +515,12 @@ Comments are anchored to a single file and line range for v1. Cross-file concern
 
 ### 9.3 Concurrent Access
 
-Both the extension and the CLI can write to `store.json` simultaneously (e.g., the developer adds a comment while the agent is writing a reply). With a single JSON file, this is a last-write-wins race condition. Mitigation options:
-- File locking (flock or similar) in both the extension and CLI.
-- Optimistic concurrency with read-merge-write (read the file, apply the change, write back, retry if the file changed between read and write).
-- Accept the race and document it as a known limitation for v1.
+Both the extension and the CLI can write to `store.json` simultaneously (e.g., the developer adds a comment while the agent is writing a reply). To prevent dropped updates and temp-file collisions, v1 must use:
+- Process-level store locking for all writes.
+- Mutation-on-latest writes for command operations (`reply`, `resolve`, `unresolve`) so updates apply to the most recent on-disk state.
+- Atomic writes using a unique temp filename per write followed by rename.
 
-Given that simultaneous writes are unlikely (the developer adds comments during review, then the agent processes them sequentially), this is probably a v2 concern. But the implementation should at least use atomic writes (write to temp file, rename) to avoid corrupt reads.
+If a write cannot acquire the lock in time, the CLI should return a clear retryable error (not a raw stack trace).
 
 ### 9.4 Large Projects and Performance
 
@@ -524,7 +542,7 @@ When a comment is resolved, does that mean:
 - The feedback was acknowledged (the agent replied and the human is satisfied)?
 - The thread is simply closed (either party can resolve)?
 
-Leaning toward: either party can resolve, and resolution is a soft state (can be reopened). The semantics are "this thread no longer needs attention," not "this issue is verified fixed." Verification happens in the main conversation or in a subsequent review pass.
+Implemented direction: either party can resolve, and resolution is a soft workflow state (can be reopened). The semantics are "this thread no longer needs attention," not "this issue is verified fixed." Verification happens in the main conversation or in a subsequent review pass. Anchor reliability is tracked independently (`anchorState`), so resolved threads can still become stale/orphaned later. While resolved, reply actions are disabled until the thread is reopened.
 
 ### 9.7 Comment Authorship
 
@@ -569,7 +587,7 @@ The UX gold standard for inline code comments. Uses VS Code's Comments API (whic
 
 The recommended build order, with each step producing a usable increment:
 
-**Phase 1: Store format + CLI skeleton** — Define the JSON schema and build the CLI tool with basic operations: `list`, `get`, `reply`, `resolve`, `summary`. No reconciliation yet — just reads/writes to the store with static line numbers. This is testable independently by hand-editing `store.json`.
+**Phase 1: Store format + CLI skeleton** — Define the JSON schema and build the CLI tool with basic operations: `list`, `get`, `reply`, `resolve`, `unresolve`, `summary`. No reconciliation yet — just reads/writes to the store with static line numbers. This is testable independently by hand-editing `store.json`.
 
 **Phase 2: Extension skeleton** — Get the VS Code Comments API wired up. The developer can add comments on lines, see them in the gutter, reply to them, and resolve them. Comments persist to `.feedback/store.json`. File watching picks up external changes to the store (agent replies). This is a usable local annotation tool.
 
@@ -592,7 +610,7 @@ The recommended build order, with each step producing a usable increment:
 The system is working when the following workflow is smooth and unbroken:
 
 1. Developer opens VS Code, reviews code the agent wrote.
-2. Developer clicks on lines, types comments. Each comment is immediately `open` in the store. Repeats across multiple files.
+2. Developer clicks on lines, types comments. Each comment is immediately stored with `workflowState=open` and `anchorState=anchored`. Repeats across multiple files.
 3. Developer tells the agent (in their normal chat): "I've left inline feedback on the auth module, check it." Alternatively, the agent checks on its own because the skill file instructs it to run `feedback-cli summary` before starting work.
 4. Agent runs `feedback-cli list`, sees the comments with accurate line numbers (reconciled lazily by the CLI even if files changed since the comments were written).
 5. Agent runs `feedback-cli context <id>` for each, reads the feedback with surrounding code.
@@ -600,7 +618,7 @@ The system is working when the following workflow is smooth and unbroken:
 7. Developer sees the agent's replies appear inline in VS Code, right next to their original comments.
 8. Developer resolves the ones they're satisfied with, continues the conversation on the ones they're not.
 9. Agent makes the agreed-upon code changes.
-10. Developer does another review pass. Comments on changed code are flagged as stale (detected by reconciliation). Comments on deleted files are marked orphaned. New comments are added. The developer never sees a comment pointing at the wrong line for a file they have open.
+10. Developer does another review pass. Comments on changed code get `anchorState=stale` (detected by reconciliation). Comments on deleted files get `anchorState=orphaned`. Workflow state (`open`/`resolved`) remains independent. New comments are added. The developer never sees a comment pointing at the wrong line for a file they have open.
 11. The cycle continues until the work is done.
 
 At no point does git see any of this. At no point does the developer reference a line number by hand. At no point does the main conversation get cluttered with the full text of every inline comment.

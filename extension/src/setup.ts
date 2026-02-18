@@ -408,25 +408,33 @@ Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedb
    - \`.feedback/bin/feedback-cli context <comment-id>\`
 3. Reply directly in the thread:
    - \`.feedback/bin/feedback-cli reply <comment-id> --message "..." \`
-4. Resolve once complete:
+4. Resolve only after the requested action is complete (or the developer confirms no change is needed):
    - \`.feedback/bin/feedback-cli resolve <comment-id>\`
+5. Reopen if follow-up work remains:
+   - \`.feedback/bin/feedback-cli unresolve <comment-id>\`
 
 ## Conventions
 
-- Treat \`open\` comments as actionable review items.
-- Treat \`stale\` comments as potentially outdated: flag in main chat before acting.
-- Treat \`orphaned\` comments as file-move/delete follow-up.
-- If a comment is informational or preference-only (no explicit change request), prefer a thread reply without making code edits.
-- Keep file-specific discussion in comment threads; use main chat for cross-cutting decisions.
+- Default to conversational handling first: read feedback, reply, and clarify before editing code.
+- Treat \`workflow=open\` comments as review items to triage, not automatic edit instructions.
+- Treat \`anchor=stale\` comments as potentially outdated: flag in main chat before acting.
+- Treat \`anchor=orphaned\` comments as file-move/delete follow-up.
+- Do not edit code unless there is a clear, explicit instruction to change code (in the thread or main chat).
+- For each comment, choose one primary response channel:
+  - Use the thread for localized feedback, clarifications, and brief acknowledgements.
+  - Use the main chat for cross-cutting decisions, tradeoffs, or direction changes.
+- Avoid duplicating full responses in both places; if escalating to main chat, leave a short thread pointer.
+- If a comment is informational or preference-only, prefer a brief in-thread acknowledgement and no code edits.
 - The source-of-truth store is \`.feedback/store.json\`; use the CLI unless debugging.
 
 ## Commands
 
-- \`.feedback/bin/feedback-cli list [--status open|resolved|stale|orphaned|all] [--file <path>] [--json]\`
+- \`.feedback/bin/feedback-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]\`
 - \`.feedback/bin/feedback-cli get <comment-id> [--json]\`
 - \`.feedback/bin/feedback-cli context <comment-id> [--lines N] [--json]\`
 - \`.feedback/bin/feedback-cli reply <comment-id> --message "..." \`
 - \`.feedback/bin/feedback-cli resolve <comment-id>\`
+- \`.feedback/bin/feedback-cli unresolve <comment-id>\`
 - \`.feedback/bin/feedback-cli summary [--json]\`
 `;
 }

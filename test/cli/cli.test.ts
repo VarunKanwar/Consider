@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const { execFileSync } = require('child_process');
+const { execFileSync, spawn } = require('child_process');
 
 const ROOT = process.cwd();
 const CLI_PATH = path.join(ROOT, 'cli', 'feedback-cli.js');
@@ -67,15 +67,42 @@ function runFail(args, cwd) {
   }
 }
 
+function runAsync(
+  args: string[],
+  cwd: string
+): Promise<{ code: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn('node', [CLI_PATH, ...args], {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString('utf-8');
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString('utf-8');
+    });
+    child.on('close', (code) => {
+      resolve({ code, stdout, stderr });
+    });
+  });
+}
+
 const SAMPLE_COMMENTS = [
   {
     id: 'c_aaa11111',
     file: 'src/main.ts',
     anchor: { startLine: 4, endLine: 4, targetContent: '  const x = 1;' },
-    status: 'open',
+    workflowState: 'open',
+    anchorState: 'anchored',
     createdAt: '2025-02-15T10:00:00Z',
     author: 'human',
     body: 'This variable name is too short.',
+    agentLastSeenAt: '2025-02-15T10:02:00Z',
     thread: [
       {
         id: 'r_bbb22222',
@@ -89,7 +116,8 @@ const SAMPLE_COMMENTS = [
     id: 'c_ccc33333',
     file: 'src/main.ts',
     anchor: { startLine: 6, endLine: 6, targetContent: '  const z = x + y;' },
-    status: 'open',
+    workflowState: 'open',
+    anchorState: 'stale',
     createdAt: '2025-02-15T10:02:00Z',
     author: 'human',
     body: 'Missing null check on inputs.',
@@ -99,7 +127,8 @@ const SAMPLE_COMMENTS = [
     id: 'c_ddd44444',
     file: 'src/config.ts',
     anchor: { startLine: 1, endLine: 1, targetContent: 'export const config = {};' },
-    status: 'resolved',
+    workflowState: 'resolved',
+    anchorState: 'anchored',
     createdAt: '2025-02-15T09:00:00Z',
     author: 'human',
     body: 'Config should be loaded from env.',
@@ -109,7 +138,8 @@ const SAMPLE_COMMENTS = [
     id: 'c_eee55555',
     file: 'src/deleted.ts',
     anchor: { startLine: 1, endLine: 1 },
-    status: 'orphaned',
+    workflowState: 'resolved',
+    anchorState: 'orphaned',
     createdAt: '2025-02-15T08:00:00Z',
     author: 'human',
     body: 'This file needs refactoring.',
@@ -146,7 +176,7 @@ describe('cli', () => {
       assert.ok(out.includes('c_aaa11111'));
       assert.ok(out.includes('c_ccc33333'));
       assert.ok(!out.includes('c_ddd44444')); // resolved
-      assert.ok(!out.includes('c_eee55555')); // orphaned
+      assert.ok(!out.includes('c_eee55555')); // resolved orphaned
     });
 
     it('lists all comments with --status all', () => {
@@ -159,6 +189,19 @@ describe('cli', () => {
     it('filters by status', () => {
       const out = run(['list', '--status', 'resolved'], tmpDir);
       assert.ok(out.includes('c_ddd44444'));
+      assert.ok(out.includes('c_eee55555'));
+      assert.ok(!out.includes('c_aaa11111'));
+    });
+
+    it('filters by anchor state', () => {
+      const out = run(['list', '--workflow', 'all', '--anchor', 'orphaned'], tmpDir);
+      assert.ok(out.includes('c_eee55555'));
+      assert.ok(!out.includes('c_aaa11111'));
+    });
+
+    it('filters unseen comments', () => {
+      const out = run(['list', '--unseen'], tmpDir);
+      assert.ok(out.includes('c_ccc33333'));
       assert.ok(!out.includes('c_aaa11111'));
     });
 
@@ -233,6 +276,7 @@ describe('cli', () => {
       assert.equal(comment.thread[0].author, 'agent');
       assert.equal(comment.thread[0].body, 'Will fix.');
       assert.ok(comment.thread[0].id.startsWith('r_'));
+      assert.ok(typeof comment.agentLastSeenAt === 'string');
     });
 
     it('appends to existing thread', () => {
@@ -252,6 +296,34 @@ describe('cli', () => {
       const err = runFail(['reply', 'c_nope', '--message', 'x'], tmpDir);
       assert.ok(err.includes('not found'));
     });
+
+    it('fails on resolved comment', () => {
+      const err = runFail(['reply', 'c_ddd44444', '--message', 'x'], tmpDir);
+      assert.ok(err.includes('resolved'));
+      assert.ok(err.includes('unresolve'));
+    });
+
+    it('keeps both updates under concurrent replies', async () => {
+      const first = runAsync(
+        ['reply', 'c_aaa11111', '--message', 'Concurrent reply A'],
+        tmpDir
+      );
+      const second = runAsync(
+        ['reply', 'c_ccc33333', '--message', 'Concurrent reply B'],
+        tmpDir
+      );
+
+      const [firstResult, secondResult] = await Promise.all([first, second]);
+      assert.equal(firstResult.code, 0, firstResult.stderr || firstResult.stdout);
+      assert.equal(secondResult.code, 0, secondResult.stderr || secondResult.stdout);
+
+      const data = readStoreFile(tmpDir);
+      const firstComment = data.comments.find(c => c.id === 'c_aaa11111');
+      const secondComment = data.comments.find(c => c.id === 'c_ccc33333');
+
+      assert.ok(firstComment.thread.some(r => r.body === 'Concurrent reply A'));
+      assert.ok(secondComment.thread.some(r => r.body === 'Concurrent reply B'));
+    });
   });
 
   // --- resolve ---
@@ -260,7 +332,7 @@ describe('cli', () => {
       run(['resolve', 'c_aaa11111'], tmpDir);
       const data = readStoreFile(tmpDir);
       const comment = data.comments.find(c => c.id === 'c_aaa11111');
-      assert.equal(comment.status, 'resolved');
+      assert.equal(comment.workflowState, 'resolved');
     });
 
     it('reports already resolved', () => {
@@ -274,22 +346,40 @@ describe('cli', () => {
     });
   });
 
+  // --- unresolve ---
+  describe('unresolve', () => {
+    it('reopens a resolved comment', () => {
+      run(['unresolve', 'c_ddd44444'], tmpDir);
+      const data = readStoreFile(tmpDir);
+      const comment = data.comments.find(c => c.id === 'c_ddd44444');
+      assert.equal(comment.workflowState, 'open');
+    });
+
+    it('reports already open', () => {
+      const out = run(['unresolve', 'c_aaa11111'], tmpDir);
+      assert.ok(out.includes('already open'));
+    });
+  });
+
   // --- summary ---
   describe('summary', () => {
     it('shows open count and file count', () => {
       const out = run(['summary'], tmpDir);
       assert.ok(out.includes('2 open comments'));
       assert.ok(out.includes('1 file'));
+      assert.ok(out.includes('Unseen open comments: 1'));
     });
 
     it('outputs JSON', () => {
       const out = run(['summary', '--json'], tmpDir);
       const data = JSON.parse(out);
       assert.equal(data.total, 4);
-      assert.equal(data.byStatus.open, 2);
-      assert.equal(data.byStatus.resolved, 1);
-      assert.equal(data.byStatus.orphaned, 1);
+      assert.equal(data.byWorkflow.open, 2);
+      assert.equal(data.byWorkflow.resolved, 2);
+      assert.equal(data.byAnchor.anchored, 2);
+      assert.equal(data.byAnchor.orphaned, 2);
       assert.equal(data.openFilesCount, 1);
+      assert.equal(data.unseenOpenCount, 1);
     });
 
     it('handles empty store', () => {
@@ -328,10 +418,9 @@ describe('cli', () => {
       assert.ok(err.includes('orphaned'));
     });
 
-    it('fails when file does not exist', () => {
-      // c_ddd44444 points to src/config.ts which doesn't exist in tmp project
+    it('fails on missing-file anchor after reconciliation', () => {
       const err = runFail(['context', 'c_ddd44444'], tmpDir);
-      assert.ok(err.includes('File not found') || err.includes('not found'));
+      assert.ok(err.includes('orphaned'));
     });
   });
 

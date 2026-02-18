@@ -65,8 +65,8 @@ export function archiveResolvedComments(
   projectRoot: string,
   store: FeedbackStore
 ): ArchiveResolvedResult {
-  const resolved = store.comments.filter((comment) => comment.status === 'resolved');
-  const unresolved = store.comments.filter((comment) => comment.status !== 'resolved');
+  const resolved = store.comments.filter((comment) => comment.workflowState === 'resolved');
+  const unresolved = store.comments.filter((comment) => comment.workflowState !== 'resolved');
 
   if (resolved.length === 0) {
     return {
@@ -95,4 +95,3 @@ export function archiveResolvedComments(
     archiveFileCreated,
   };
 }
-

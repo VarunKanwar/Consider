@@ -10,6 +10,8 @@ import {
   FeedbackComment,
   FeedbackStore,
   Reply,
+  getCommentStatus,
+  hasUnseenHumanActivity,
 } from './store';
 import { hashAnchorContent, reconcileStoreForExtension } from './reconcile';
 import {
@@ -19,7 +21,11 @@ import {
   SetupIntegrationTarget,
 } from './setup';
 import { archiveResolvedComments } from './archive';
-import { CommentStatusFilter, groupCommentsByFile } from './tree-data';
+import {
+  CommentVisibilityFilter,
+  DEFAULT_COMMENT_VISIBILITY_FILTER,
+  groupCommentsByFile,
+} from './tree-data';
 
 // --- Comment author labels ---
 const HUMAN_AUTHOR: vscode.CommentAuthorInformation = {
@@ -47,13 +53,16 @@ class FeedbackReply implements vscode.Comment {
     body: string,
     author: vscode.CommentAuthorInformation,
     storeId: string,
-    mode: vscode.CommentMode = vscode.CommentMode.Preview
+    mode: vscode.CommentMode = vscode.CommentMode.Preview,
+    label?: string
   ) {
     this.body = new vscode.MarkdownString(body);
     this.author = author;
     this.mode = mode;
     this.storeId = storeId;
-    if (author === AGENT_AUTHOR) {
+    if (typeof label === 'string' && label.length > 0) {
+      this.label = label;
+    } else if (author === AGENT_AUTHOR) {
       this.label = 'Agent';
     }
   }
@@ -86,6 +95,33 @@ function truncateTreeText(value: string, max = 90): string {
   return `${value.slice(0, max - 3)}...`;
 }
 
+function workflowTagText(state: FeedbackComment['workflowState']): string {
+  return state === 'resolved' ? 'Resolved' : '';
+}
+
+function anchorTagText(state: FeedbackComment['anchorState']): string {
+  if (state === 'stale') {
+    return 'Stale';
+  }
+  if (state === 'orphaned') {
+    return 'Orphaned';
+  }
+  return '';
+}
+
+function statusTagText(comment: FeedbackComment): string {
+  const parts: string[] = [];
+  const workflow = workflowTagText(comment.workflowState);
+  const anchor = anchorTagText(comment.anchorState);
+  if (workflow.length > 0) {
+    parts.push(workflow);
+  }
+  if (anchor.length > 0) {
+    parts.push(anchor);
+  }
+  return parts.join(' • ');
+}
+
 class FeedbackCommentsTreeProvider
   implements vscode.TreeDataProvider<FeedbackTreeNode> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
@@ -94,7 +130,9 @@ class FeedbackCommentsTreeProvider
   readonly onDidChangeTreeData = this.onDidChangeTreeDataEmitter.event;
 
   private comments: FeedbackComment[] = [];
-  private statusFilter: CommentStatusFilter = 'all';
+  private visibilityFilter: CommentVisibilityFilter = {
+    ...DEFAULT_COMMENT_VISIBILITY_FILTER,
+  };
   private fileNodes: FeedbackFileNode[] = [];
   private commentNodesById: Map<string, FeedbackCommentNode> = new Map();
   private nodeSequence = 0;
@@ -107,14 +145,17 @@ class FeedbackCommentsTreeProvider
     this.refresh();
   }
 
-  setStatusFilter(statusFilter: CommentStatusFilter): void {
-    this.statusFilter = statusFilter;
+  setVisibilityFilter(visibilityFilter: CommentVisibilityFilter): void {
+    this.visibilityFilter = {
+      showResolved: visibilityFilter.showResolved,
+      showStale: visibilityFilter.showStale,
+    };
     this.rebuildNodes();
     this.refresh();
   }
 
-  getStatusFilter(): CommentStatusFilter {
-    return this.statusFilter;
+  getVisibilityFilter(): CommentVisibilityFilter {
+    return { ...this.visibilityFilter };
   }
 
   refresh(): void {
@@ -138,26 +179,31 @@ class FeedbackCommentsTreeProvider
     }
 
     const { comment } = element;
+    const status = getCommentStatus(comment);
+    const unseen = hasUnseenHumanActivity(comment) ? 'unseen' : 'seen';
+    const statusText = statusTagText(comment);
     const item = new vscode.TreeItem(
       `${formatCommentLineRange(comment)} ${truncateTreeText(comment.body, 72)}`,
       vscode.TreeItemCollapsibleState.None
     );
     item.id = element.nodeId;
-    item.description = `${comment.status} • ${comment.id}`;
-    item.tooltip = `${comment.file}:${comment.anchor.startLine}\n\n${comment.body}`;
-    item.iconPath = comment.status === 'resolved'
-      ? new vscode.ThemeIcon('pass')
-      : comment.status === 'stale'
+    item.description = statusText.length > 0
+      ? `${statusText} • ${comment.id}`
+      : comment.id;
+    item.tooltip = `${comment.file}:${comment.anchor.startLine}\n${statusText.length > 0 ? statusText : 'Open'} • ${unseen}\n\n${comment.body}`;
+    item.iconPath = comment.anchorState === 'orphaned'
+      ? new vscode.ThemeIcon('question')
+      : comment.anchorState === 'stale'
         ? new vscode.ThemeIcon('warning')
-        : comment.status === 'orphaned'
-          ? new vscode.ThemeIcon('question')
+        : comment.workflowState === 'resolved'
+          ? new vscode.ThemeIcon('pass')
           : new vscode.ThemeIcon('comment');
     item.command = {
       command: 'feedback-loop.openCommentFromTree',
       title: 'Open Feedback Comment',
       arguments: [comment.id],
     };
-    item.contextValue = `feedback-comment-${comment.status}`;
+    item.contextValue = `feedback-comment-${status}`;
     return item;
   }
 
@@ -179,7 +225,7 @@ class FeedbackCommentsTreeProvider
   }
 
   private rebuildNodes(): void {
-    const grouped = groupCommentsByFile(this.comments, this.statusFilter);
+    const grouped = groupCommentsByFile(this.comments, this.visibilityFilter);
     this.fileNodes = grouped.map(
       (group) =>
         ({
@@ -223,6 +269,9 @@ class FeedbackLoopController {
   /** Debounce flag to avoid re-reading store during our own writes */
   private suppressWatcher = false;
   private reconcileTimers: Map<string, NodeJS.Timeout> = new Map();
+  private commentVisibilityFilter: CommentVisibilityFilter = {
+    ...DEFAULT_COMMENT_VISIBILITY_FILTER,
+  };
 
   constructor(private context: vscode.ExtensionContext) {
     this.projectRoot = this.getProjectRoot();
@@ -513,7 +562,8 @@ class FeedbackLoopController {
         contentHash: hashAnchorContent(targetContent),
         lastAnchorCheck: now,
       },
-      status: 'open',
+      workflowState: 'open',
+      anchorState: 'anchored',
       createdAt: now,
       author: 'human',
       body: normalizedBody,
@@ -526,11 +576,10 @@ class FeedbackLoopController {
     const newComment = new FeedbackReply(
       normalizedBody,
       HUMAN_AUTHOR,
-      commentId,
-      vscode.CommentMode.Preview
+      commentId
     );
     thread.comments = [newComment];
-    this.applyThreadPresentation(thread, 'open');
+    this.applyThreadPresentation(thread, feedbackComment);
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
 
     // Track the thread
@@ -549,6 +598,12 @@ class FeedbackLoopController {
     const comment = findComment(store, commentId);
     if (!comment) {
       vscode.window.showErrorMessage(`Comment ${commentId} not found in store.`);
+      return;
+    }
+    if (comment.workflowState === 'resolved') {
+      vscode.window.showInformationMessage(
+        'This thread is resolved. Use Unresolve before replying.'
+      );
       return;
     }
 
@@ -582,10 +637,10 @@ class FeedbackLoopController {
     const comment = findComment(store, commentId);
     if (!comment) return;
 
-    comment.status = 'resolved';
+    comment.workflowState = 'resolved';
     this.writeStoreSuppress(store);
 
-    this.applyThreadPresentation(thread, 'resolved');
+    this.applyThreadPresentation(thread, comment);
   }
 
   private handleUnresolve(thread: vscode.CommentThread): void {
@@ -596,10 +651,10 @@ class FeedbackLoopController {
     const comment = findComment(store, commentId);
     if (!comment) return;
 
-    comment.status = 'open';
+    comment.workflowState = 'open';
     this.writeStoreSuppress(store);
 
-    this.applyThreadPresentation(thread, 'open');
+    this.applyThreadPresentation(thread, comment);
   }
 
   private handleDeleteComment(comment: FeedbackReply): void {
@@ -1188,23 +1243,43 @@ class FeedbackLoopController {
   }
 
   private async handleShowAllComments(): Promise<void> {
-    const filterOptions: Array<{ label: string; value: CommentStatusFilter }> = [
-      { label: 'All statuses', value: 'all' },
-      { label: 'Open only', value: 'open' },
-      { label: 'Resolved only', value: 'resolved' },
-      { label: 'Stale only', value: 'stale' },
-      { label: 'Orphaned only', value: 'orphaned' },
+    type VisibilityQuickPickItem = vscode.QuickPickItem & {
+      key: 'showResolved' | 'showStale';
+    };
+
+    const current = this.commentVisibilityFilter;
+    const options: VisibilityQuickPickItem[] = [
+      {
+        key: 'showResolved',
+        label: 'Show resolved',
+        description: 'Include workflow-resolved threads in the tree and comments panel',
+        picked: current.showResolved,
+      },
+      {
+        key: 'showStale',
+        label: 'Show stale',
+        description: 'Include stale-anchor threads in the tree and comments panel',
+        picked: current.showStale,
+      },
     ];
 
-    const selected = await vscode.window.showQuickPick(filterOptions, {
-      placeHolder: 'Choose which feedback status to show in the Feedback Comments view',
+    const selected = await vscode.window.showQuickPick(options, {
+      canPickMany: true,
+      placeHolder: 'Toggle visibility checkboxes for Feedback comments',
       ignoreFocusOut: true,
     });
     if (!selected) {
       return;
     }
 
-    this.commentsTreeProvider.setStatusFilter(selected.value);
+    const next: CommentVisibilityFilter = {
+      showResolved: selected.some((item) => item.key === 'showResolved'),
+      showStale: selected.some((item) => item.key === 'showStale'),
+    };
+
+    this.commentVisibilityFilter = next;
+    this.commentsTreeProvider.setVisibilityFilter(next);
+    this.reloadFromStore();
 
     try {
       await vscode.commands.executeCommand('feedback-loop.comments.focus');
@@ -1386,7 +1461,11 @@ class FeedbackLoopController {
     let changed = false;
 
     for (const comment of store.comments) {
-      if (comment.status !== 'open' || comment.file !== relativePath) {
+      if (
+        comment.workflowState !== 'open' ||
+        comment.anchorState !== 'anchored' ||
+        comment.file !== relativePath
+      ) {
         continue;
       }
       const thread = this.threadMap.get(comment.id);
@@ -1468,6 +1547,19 @@ class FeedbackLoopController {
     this.disposables.push(this.storeWatcher);
   }
 
+  private isCommentVisible(comment: FeedbackComment): boolean {
+    if (
+      !this.commentVisibilityFilter.showResolved &&
+      comment.workflowState === 'resolved'
+    ) {
+      return false;
+    }
+    if (!this.commentVisibilityFilter.showStale && comment.anchorState === 'stale') {
+      return false;
+    }
+    return true;
+  }
+
   /**
    * Reload all comment threads from the store.
    * Called when the store file changes externally (e.g., agent replied via CLI).
@@ -1482,12 +1574,14 @@ class FeedbackLoopController {
     }
     this.commentsTreeProvider.setStore(store);
 
-    // Build a set of comment IDs in the store for diffing
-    const storeIds = new Set(store.comments.map((c) => c.id));
+    // Build a set of visible comment IDs in the store for diffing
+    const visibleIds = new Set(
+      store.comments.filter((comment) => this.isCommentVisible(comment)).map((c) => c.id)
+    );
 
     // Remove threads for comments that no longer exist in the store
     for (const [commentId, thread] of this.threadMap) {
-      if (!storeIds.has(commentId)) {
+      if (!visibleIds.has(commentId)) {
         thread.dispose();
         this.threadMap.delete(commentId);
       }
@@ -1495,6 +1589,9 @@ class FeedbackLoopController {
 
     // Update existing threads and create new ones
     for (const comment of store.comments) {
+      if (!this.isCommentVisible(comment)) {
+        continue;
+      }
       const existingThread = this.threadMap.get(comment.id);
       if (existingThread) {
         // Update thread contents (picks up new replies from agent)
@@ -1535,7 +1632,7 @@ class FeedbackLoopController {
 
     thread.comments = comments;
 
-    this.applyThreadPresentation(thread, comment.status);
+    this.applyThreadPresentation(thread, comment);
 
     // Update range if anchor changed (will matter in Phase 3)
     const newRange = this.buildStoredAnchorRange(
@@ -1557,6 +1654,9 @@ class FeedbackLoopController {
     this.commentsTreeProvider.setStore(store);
 
     for (const comment of store.comments) {
+      if (!this.isCommentVisible(comment)) {
+        continue;
+      }
       this.createThreadFromStore(comment);
     }
   }
@@ -1598,7 +1698,7 @@ class FeedbackLoopController {
     }
 
     thread.comments = comments;
-    this.applyThreadPresentation(thread, comment.status);
+    this.applyThreadPresentation(thread, comment);
     thread.collapsibleState = vscode.CommentThreadCollapsibleState.Collapsed;
 
     this.threadMap.set(comment.id, thread);
@@ -1724,22 +1824,20 @@ class FeedbackLoopController {
 
   private applyThreadPresentation(
     thread: vscode.CommentThread,
-    status: FeedbackComment['status']
+    comment: FeedbackComment
   ): void {
-    thread.label = status === 'stale'
-      ? 'Stale Feedback'
-      : status === 'orphaned'
-        ? 'Orphaned Feedback'
-        : 'Feedback';
+    const statusText = statusTagText(comment);
+    thread.label = statusText.length > 0 ? `Feedback • ${statusText}` : 'Feedback';
+    thread.canReply = comment.workflowState !== 'resolved';
 
-    if (status === 'resolved') {
+    if (comment.workflowState === 'resolved') {
       thread.state = vscode.CommentThreadState.Resolved;
       thread.contextValue = 'feedback-thread-resolved';
       return;
     }
 
     thread.state = vscode.CommentThreadState.Unresolved;
-    thread.contextValue = `feedback-thread-${status}`;
+    thread.contextValue = 'feedback-thread-open';
   }
 
   /**
@@ -1747,12 +1845,30 @@ class FeedbackLoopController {
    */
   private writeStoreSuppress(store: FeedbackStore): void {
     this.suppressWatcher = true;
-    this.commentsTreeProvider.setStore(store);
-    writeStore(this.projectRoot, store);
-    // Re-enable watcher after a short delay to let the file event settle
-    setTimeout(() => {
-      this.suppressWatcher = false;
-    }, 500);
+    try {
+      this.commentsTreeProvider.setStore(store);
+      writeStore(this.projectRoot, store);
+    } catch (err) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        (err as { code?: string }).code === 'ESTORECONFLICT'
+      ) {
+        // Another writer updated the store between read and write. Reload and
+        // ask the user to retry rather than silently overwriting.
+        this.reloadFromStore();
+        vscode.window.showWarningMessage(
+          'Feedback store changed while saving. Please retry your last action.'
+        );
+        return;
+      }
+      throw err;
+    } finally {
+      // Re-enable watcher after a short delay to let the file event settle
+      setTimeout(() => {
+        this.suppressWatcher = false;
+      }, 500);
+    }
   }
 
   dispose(): void {

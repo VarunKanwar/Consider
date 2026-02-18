@@ -190,7 +190,8 @@ suite('Feedback Loop Extension Host', () => {
     const store = readJson(path.join(root, '.feedback', 'store.json'));
     const inserted = store.comments.find((comment) => comment.id === commentId);
     assert.ok(inserted, 'Expected inserted comment to still exist in store.');
-    assert.equal(inserted.status, 'open');
+    assert.equal(inserted.workflowState, 'open');
+    assert.equal(inserted.anchorState, 'anchored');
     assert.equal(inserted.file, 'src/sample.ts');
   });
 
@@ -252,14 +253,23 @@ suite('Feedback Loop Extension Host', () => {
     let store = readJson(path.join(root, '.feedback', 'store.json'));
     let comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after resolve command.');
-    assert.equal(comment.status, 'resolved');
+    assert.equal(comment.workflowState, 'resolved');
     assert.equal(thread.state, vscode.CommentThreadState.Resolved);
+
+    await vscode.commands.executeCommand('feedback-loop.replyToComment', {
+      thread,
+      text: 'should be blocked while resolved',
+    });
+    store = readJson(path.join(root, '.feedback', 'store.json'));
+    comment = store.comments.find((entry) => entry.id === commentId);
+    assert.ok(comment, 'Expected comment after blocked reply.');
+    assert.equal(comment.thread.length, 0);
 
     await vscode.commands.executeCommand('feedback-loop.unresolveThread', thread);
     store = readJson(path.join(root, '.feedback', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after reopen command.');
-    assert.equal(comment.status, 'open');
+    assert.equal(comment.workflowState, 'open');
     assert.equal(thread.state, vscode.CommentThreadState.Unresolved);
   });
 
@@ -426,11 +436,12 @@ suite('Feedback Loop Extension Host', () => {
     let store = readJson(path.join(root, '.feedback', 'store.json'));
     let comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after stale transition.');
-    assert.equal(comment.status, 'stale');
+    assert.equal(comment.anchorState, 'stale');
     await waitFor(
       () =>
-        thread.contextValue === 'feedback-thread-stale' &&
-        thread.label === 'Stale Feedback',
+        thread.contextValue === 'feedback-thread-open' &&
+        typeof thread.label === 'string' &&
+        thread.label.includes('Stale'),
       'thread stale status presentation'
     );
 
@@ -439,11 +450,12 @@ suite('Feedback Loop Extension Host', () => {
     store = readJson(path.join(root, '.feedback', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after orphan transition.');
-    assert.equal(comment.status, 'orphaned');
+    assert.equal(comment.anchorState, 'orphaned');
     await waitFor(
       () =>
-        thread.contextValue === 'feedback-thread-orphaned' &&
-        thread.label === 'Orphaned Feedback',
+        thread.contextValue === 'feedback-thread-open' &&
+        typeof thread.label === 'string' &&
+        thread.label.includes('Orphaned'),
       'thread orphaned status presentation'
     );
   });
@@ -459,7 +471,8 @@ suite('Feedback Loop Extension Host', () => {
         id: 'c_open_1',
         file: 'src/sample.ts',
         anchor: { startLine: 1, endLine: 1 },
-        status: 'open',
+        workflowState: 'open',
+        anchorState: 'anchored',
         createdAt: '2025-02-15T10:00:00.000Z',
         author: 'human',
         body: 'Open comment',
@@ -469,7 +482,8 @@ suite('Feedback Loop Extension Host', () => {
         id: 'c_resolved_1',
         file: 'src/sample.ts',
         anchor: { startLine: 2, endLine: 2 },
-        status: 'resolved',
+        workflowState: 'resolved',
+        anchorState: 'anchored',
         createdAt: '2025-02-15T10:00:00.000Z',
         author: 'human',
         body: 'Resolved comment',

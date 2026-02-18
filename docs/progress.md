@@ -511,3 +511,68 @@
 ### What's known to be incomplete
 
 1. **No selective per-agent uninstall UI yet:** uninstall currently offers two coarse modes (full vs skills-only), not per-agent toggles.
+
+---
+
+## Phase 9: Thread State Model Split
+
+**Status:** Complete
+
+### What was built
+
+1. **Store schema split + migration compatibility** (`shared/store.js`, `extension/src/store.ts`)
+   - Replaced single `status` field with:
+     - `workflowState`: `open|resolved`
+     - `anchorState`: `anchored|stale|orphaned`
+   - Added backward-compatible read normalization for legacy stores that still use `status`.
+   - Added `agentLastSeenAt` support and unseen-human-activity helpers.
+
+2. **Reconciliation behavior updated to anchor-only transitions** (`shared/reconcile.js`)
+   - Reconciliation now updates `anchorState` independently of workflow state.
+   - Resolved threads can become stale/orphaned when files change/delete.
+   - Successful re-anchor sets `anchorState=anchored` without reopening workflow state.
+
+3. **CLI workflow/anchor UX + reopen command** (`cli/feedback-cli.js`)
+   - `list` now supports `--workflow`, `--anchor`, and `--unseen`.
+   - Kept `--status` as a legacy alias for backward compatibility.
+   - Added `unresolve <comment-id>`.
+   - `summary` now reports `byWorkflow`, `byAnchor`, and `unseenOpenCount`.
+   - `reply`/`resolve`/`unresolve` mark `agentLastSeenAt`.
+
+4. **Extension rendering and actions aligned with split model** (`extension/src/extension.ts`, `extension/src/tree-data.ts`, `extension/src/archive.ts`, `extension/package.json`)
+   - Thread labels now render workflow state (`Open`/`Resolved`) and anchor reliability (`Stale Anchor`/`Missing File`).
+   - Resolve/Reopen actions are controlled by workflow state.
+   - Feedback Comments tree now shows workflow + anchor in descriptions and filters accordingly.
+   - Archive now archives by `workflowState=resolved`.
+
+5. **Skill guidance + command docs updated** (`extension/src/setup.ts`)
+   - Skill instructions now document workflow/anchor semantics, `unresolve`, and unseen-aware listing options.
+
+6. **Comment UX refinements for state handling** (`extension/src/extension.ts`, `extension/package.json`, `extension/src/tree-data.ts`)
+   - Added richer workflow/anchor status tags in thread headers and tree rows.
+   - Switched comment visibility controls to checkbox toggles (`show resolved`, `show stale`) and applied them to both custom tree and built-in comments panel by controlling rendered threads.
+   - Disabled replies on resolved threads until explicitly un-resolved.
+   - Exposed `Unresolve` action in thread menus more explicitly.
+
+### What was tested
+
+1. `npm test` after the full refactor.
+2. Updated CLI tests:
+   - schema fixtures,
+   - list filtering (`workflow`/`anchor`/`unseen`),
+   - resolve + unresolve flow,
+   - summary JSON shape,
+   - orphan context behavior.
+3. Updated reconciliation parity tests (CLI + extension) for anchor-state transitions.
+4. Updated extension tree/archive tests for workflow/anchor model.
+5. Added store migration test asserting legacy `status` is normalized into split state fields.
+
+### Implementation decisions not in the spec
+
+1. **Legacy filter support retained:** CLI keeps `--status` for compatibility while promoting `--workflow`/`--anchor`.
+2. **Open filter semantics in UI tree:** `Open only` maps to `workflowState=open` (includes stale/orphaned anchors if still open).
+3. **Summary shape migration:** CLI JSON summary switched from `byStatus` to `byWorkflow` + `byAnchor`.
+
+### What's known to be incomplete
+
+1. **No dedicated unread triage command yet:** unseen support exists via `list --unseen`, but no separate inbox command is implemented.

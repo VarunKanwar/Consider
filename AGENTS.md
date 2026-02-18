@@ -166,7 +166,10 @@ Every phase must include tests. What "tests" means varies by phase:
 
 **The extension copies the CLI into `.feedback/bin/`:** During the setup command, the extension copies the CLI source into the target project's `.feedback/bin/` directory. This means the CLI in `cli/` is the development source, and the copy in `.feedback/bin/` is the deployed artifact. They must be the same file. Don't introduce a build step between them.
 
-**Status model is simple:** `open` → `resolved` (either party). `open` → `stale` (reconciliation detected content change). `open` → `orphaned` (file deleted). `resolved` can be reopened to `open`. `stale` can be manually re-anchored back to `open`. That's it.
+**State model is split:** Workflow and anchor tracking are separate fields in v1:
+- `workflowState`: `open` ↔ `resolved` (either party can resolve/reopen)
+- `anchorState`: `anchored` ↔ `stale` / `orphaned` (reconciliation-driven, independent of workflow)
+Resolved comments can still become stale/orphaned if code moves or files disappear.
 
 ## When you're unsure
 

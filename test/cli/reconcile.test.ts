@@ -48,7 +48,8 @@ function makeComment({
   targetContent,
   contextBefore,
   contextAfter,
-  status = 'open',
+  workflowState = 'open',
+  anchorState = 'anchored',
 }) {
   return {
     id,
@@ -61,7 +62,8 @@ function makeComment({
       contextAfter,
       lastAnchorCheck: '2025-01-01T00:00:00.000Z',
     },
-    status,
+    workflowState,
+    anchorState,
     createdAt: '2025-02-15T10:00:00.000Z',
     author: 'human',
     body: 'Please update this.',
@@ -143,7 +145,8 @@ describe('reconcile core', () => {
     assert.equal(result.checkedComments, 1);
     assert.equal(result.updatedComments, 1);
     assert.equal(storeData.comments[0].anchor.startLine, 4);
-    assert.equal(storeData.comments[0].status, 'open');
+    assert.equal(storeData.comments[0].workflowState, 'open');
+    assert.equal(storeData.comments[0].anchorState, 'anchored');
     assert.equal((storeData.comments[0].anchor as any).contentHash.length, 8);
   });
 
@@ -186,7 +189,8 @@ describe('reconcile core', () => {
     const result = reconcile.reconcileStore(tmpDir, storeData);
     assert.equal(result.checkedComments, 1);
     assert.equal(result.updatedComments, 1);
-    assert.equal(storeData.comments[0].status, 'open');
+    assert.equal(storeData.comments[0].workflowState, 'open');
+    assert.equal(storeData.comments[0].anchorState, 'anchored');
     assert.equal(storeData.comments[0].anchor.startLine, 3);
     assert.equal(storeData.comments[0].anchor.targetContent, '  return token ?? "";');
   });
@@ -227,7 +231,7 @@ describe('reconcile core', () => {
 
     const result = reconcile.reconcileStore(tmpDir, storeData);
     assert.equal(result.checkedComments, 1);
-    assert.equal(storeData.comments[0].status, 'stale');
+    assert.equal(storeData.comments[0].anchorState, 'stale');
   });
 
   it('marks comments orphaned when file is deleted', () => {
@@ -247,10 +251,10 @@ describe('reconcile core', () => {
 
     const result = reconcile.reconcileStore(tmpDir, storeData);
     assert.equal(result.checkedComments, 1);
-    assert.equal(storeData.comments[0].status, 'orphaned');
+    assert.equal(storeData.comments[0].anchorState, 'orphaned');
   });
 
-  it('only reopens stale comments when force mode is used', () => {
+  it('re-anchors stale comments without changing workflow state', () => {
     writeFile(tmpDir, 'src/example.ts', 'const x = 1;\n');
     const comment = makeComment({
       id: 'c_force',
@@ -260,17 +264,15 @@ describe('reconcile core', () => {
       targetContent: 'const x = 1;',
       contextBefore: [],
       contextAfter: [],
-      status: 'stale',
+      workflowState: 'resolved',
+      anchorState: 'stale',
     });
     const storeData = { version: 1, comments: [comment] };
 
     const defaultRun = reconcile.reconcileStore(tmpDir, storeData);
-    assert.equal(defaultRun.checkedComments, 0);
-    assert.equal(storeData.comments[0].status, 'stale');
-
-    const forcedRun = reconcile.reconcileStore(tmpDir, storeData, { force: true });
-    assert.equal(forcedRun.checkedComments, 1);
-    assert.equal(storeData.comments[0].status, 'open');
+    assert.equal(defaultRun.checkedComments, 1);
+    assert.equal(storeData.comments[0].anchorState, 'anchored');
+    assert.equal(storeData.comments[0].workflowState, 'resolved');
   });
 });
 
@@ -351,6 +353,6 @@ describe('cli lazy reconciliation', () => {
     assert.ok(err.includes('orphaned'));
 
     const persisted = readStoreFile(tmpDir);
-    assert.equal(persisted.comments[0].status, 'orphaned');
+    assert.equal(persisted.comments[0].anchorState, 'orphaned');
   });
 });

@@ -196,14 +196,8 @@ function buildAnchorSnapshot(lines, startLine, endLine, originalAnchor, nowIso) 
   };
 }
 
-function shouldProcessComment(comment, force) {
-  if (comment.status === 'resolved') {
-    return false;
-  }
-  if (force) {
-    return true;
-  }
-  return comment.status === 'open';
+function shouldProcessComment(comment) {
+  return Boolean(comment);
 }
 
 function shouldReconcileByMtime(comment, fileInfo, force) {
@@ -220,26 +214,32 @@ function shouldReconcileByMtime(comment, fileInfo, force) {
   return fileInfo.mtimeMs > lastCheckMs;
 }
 
-function reconcileOpenLikeComment(comment, fileInfo, nowIso, force) {
+function reconcileCommentAnchor(comment, fileInfo, nowIso) {
   let changed = false;
-  let statusChanged = false;
+  let stateChanged = false;
 
   if (!comment.anchor) {
     comment.anchor = { startLine: 1, endLine: 1 };
     changed = true;
   }
 
+  if (comment.anchorState !== 'anchored' && comment.anchorState !== 'stale' && comment.anchorState !== 'orphaned') {
+    comment.anchorState = 'anchored';
+    changed = true;
+    stateChanged = true;
+  }
+
   if (!fileInfo.exists) {
-    if (comment.status !== 'orphaned') {
-      comment.status = 'orphaned';
+    if (comment.anchorState !== 'orphaned') {
+      comment.anchorState = 'orphaned';
       changed = true;
-      statusChanged = true;
+      stateChanged = true;
     }
     if (comment.anchor.lastAnchorCheck !== nowIso) {
       comment.anchor.lastAnchorCheck = nowIso;
       changed = true;
     }
-    return { changed, statusChanged };
+    return { changed, stateChanged };
   }
 
   const startLine = comment.anchor.startLine || 1;
@@ -326,16 +326,16 @@ function reconcileOpenLikeComment(comment, fileInfo, nowIso, force) {
   }
 
   if (resolvedStartLine === null) {
-    if (comment.status !== 'stale') {
-      comment.status = 'stale';
+    if (comment.anchorState !== 'stale') {
+      comment.anchorState = 'stale';
       changed = true;
-      statusChanged = true;
+      stateChanged = true;
     }
     if (comment.anchor.lastAnchorCheck !== nowIso) {
       comment.anchor.lastAnchorCheck = nowIso;
       changed = true;
     }
-    return { changed, statusChanged };
+    return { changed, stateChanged };
   }
 
   const resolvedEndLine = resolvedStartLine + targetLineCount - 1;
@@ -376,22 +376,20 @@ function reconcileOpenLikeComment(comment, fileInfo, nowIso, force) {
     changed = true;
   }
 
-  if (force && comment.status !== 'open') {
-    comment.status = 'open';
+  if (comment.anchorState !== 'anchored') {
+    comment.anchorState = 'anchored';
     changed = true;
-    statusChanged = true;
-  } else if (!force && comment.status === 'open') {
-    // no-op, explicit for clarity
+    stateChanged = true;
   }
 
-  return { changed, statusChanged };
+  return { changed, stateChanged };
 }
 
 /**
  * Reconcile anchors in-place for comments in a store.
  *
  * Options:
- *  - force: reconcile regardless of mtime and include stale/orphaned comments
+ *  - force: reconcile regardless of mtime for matching comments
  *  - files: optional array of relative file paths to restrict reconciliation
  */
 function reconcileStore(projectRoot, feedbackStore, options = {}) {
@@ -406,10 +404,10 @@ function reconcileStore(projectRoot, feedbackStore, options = {}) {
   const fileCache = new Map();
   let checkedComments = 0;
   let updatedComments = 0;
-  let statusChanges = 0;
+  let stateChanges = 0;
 
   for (const comment of feedbackStore.comments) {
-    if (!shouldProcessComment(comment, force)) {
+    if (!shouldProcessComment(comment)) {
       continue;
     }
     const normalizedFile = normalizePath(comment.file);
@@ -423,12 +421,12 @@ function reconcileStore(projectRoot, feedbackStore, options = {}) {
     }
 
     checkedComments += 1;
-    const result = reconcileOpenLikeComment(comment, fileInfo, nowIso, force);
+    const result = reconcileCommentAnchor(comment, fileInfo, nowIso);
     if (result.changed) {
       updatedComments += 1;
     }
-    if (result.statusChanged) {
-      statusChanges += 1;
+    if (result.stateChanged) {
+      stateChanges += 1;
     }
   }
 
@@ -436,7 +434,8 @@ function reconcileStore(projectRoot, feedbackStore, options = {}) {
     changed: updatedComments > 0,
     checkedComments,
     updatedComments,
-    statusChanges,
+    stateChanges,
+    statusChanges: stateChanges,
   };
 }
 
@@ -444,4 +443,3 @@ module.exports = {
   reconcileStore,
   hashContent,
 };
-

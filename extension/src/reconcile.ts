@@ -10,6 +10,7 @@ export interface ReconcileResult {
   changed: boolean;
   checkedComments: number;
   updatedComments: number;
+  stateChanges: number;
   statusChanges: number;
 }
 

@@ -34,7 +34,8 @@ function makeComment({
   targetContent,
   contextBefore,
   contextAfter,
-  status = 'open',
+  workflowState = 'open',
+  anchorState = 'anchored',
 }) {
   return {
     id,
@@ -47,7 +48,8 @@ function makeComment({
       contextAfter,
       lastAnchorCheck: '2025-01-01T00:00:00.000Z',
     },
-    status,
+    workflowState,
+    anchorState,
     createdAt: '2025-02-15T10:00:00.000Z',
     author: 'human',
     body: 'Please update this.',
@@ -163,7 +165,7 @@ describe('extension reconciliation parity', () => {
     expectParity(tmpDir, orphanCase);
   });
 
-  it('matches shared force-mode behavior for reopening stale comments', () => {
+  it('matches shared behavior for re-anchoring stale comments without workflow changes', () => {
     writeFile(tmpDir, 'src/example.ts', 'const value = 1;\n');
     const storeData = {
       version: 1,
@@ -176,11 +178,12 @@ describe('extension reconciliation parity', () => {
           targetContent: 'const value = 1;',
           contextBefore: [],
           contextAfter: [],
-          status: 'stale',
+          workflowState: 'resolved',
+          anchorState: 'stale',
         }),
       ],
     };
 
-    expectParity(tmpDir, storeData, { force: true });
+    expectParity(tmpDir, storeData, { force: false });
   });
 });

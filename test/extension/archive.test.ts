@@ -22,7 +22,13 @@ function makeStore(comments) {
   return { version: 1, comments };
 }
 
-function makeComment(id, status, file = 'src/main.ts', line = 1) {
+function makeComment(
+  id,
+  workflowState,
+  anchorState = 'anchored',
+  file = 'src/main.ts',
+  line = 1
+) {
   return {
     id,
     file,
@@ -30,7 +36,8 @@ function makeComment(id, status, file = 'src/main.ts', line = 1) {
       startLine: line,
       endLine: line,
     },
-    status,
+    workflowState,
+    anchorState,
     createdAt: '2025-02-15T10:00:00.000Z',
     author: 'human',
     body: `Comment ${id}`,
@@ -68,14 +75,14 @@ describe('archive resolved comments', () => {
     const archive = JSON.parse(fs.readFileSync(archivePath, 'utf-8'));
     assert.equal(archive.version, 1);
     assert.equal(archive.comments.length, 2);
-    assert.equal(archive.comments[0].comment.status, 'resolved');
+    assert.equal(archive.comments[0].comment.workflowState, 'resolved');
     assert.ok(typeof archive.comments[0].archivedAt === 'string');
   });
 
   it('returns no-op result when there are no resolved comments', () => {
     const store = makeStore([
       makeComment('c_open', 'open'),
-      makeComment('c_stale', 'stale'),
+      makeComment('c_stale', 'open', 'stale'),
     ]);
 
     const result = archiveResolvedComments(projectRoot, store);

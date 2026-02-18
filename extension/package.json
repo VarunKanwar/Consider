@@ -30,11 +30,13 @@
       },
       {
         "command": "feedback-loop.resolveThread",
-        "title": "Resolve"
+        "title": "Resolve",
+        "icon": "$(pass)"
       },
       {
         "command": "feedback-loop.unresolveThread",
-        "title": "Reopen"
+        "title": "Unresolve",
+        "icon": "$(refresh)"
       },
       {
         "command": "feedback-loop.deleteComment",
@@ -80,12 +82,12 @@
         {
           "command": "feedback-loop.resolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThreadContext =~ /feedback-thread-open|feedback-thread-stale/"
+          "when": "commentController == feedback-loop && commentThread == feedback-thread-open"
         },
         {
           "command": "feedback-loop.unresolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThreadContext == feedback-thread-resolved"
+          "when": "commentController == feedback-loop && commentThread == feedback-thread-resolved"
         }
       ],
       "comments/commentThread/context": [
@@ -97,7 +99,17 @@
         {
           "command": "feedback-loop.replyToComment",
           "group": "inline",
-          "when": "commentController == feedback-loop && !commentThreadIsEmpty"
+          "when": "commentController == feedback-loop && !commentThreadIsEmpty && commentThread == feedback-thread-open"
+        },
+        {
+          "command": "feedback-loop.resolveThread",
+          "group": "navigation",
+          "when": "commentController == feedback-loop && commentThread == feedback-thread-open"
+        },
+        {
+          "command": "feedback-loop.unresolveThread",
+          "group": "navigation",
+          "when": "commentController == feedback-loop && commentThread == feedback-thread-resolved"
         }
       ],
       "comments/comment/title": [
