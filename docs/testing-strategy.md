@@ -76,6 +76,7 @@ Notes:
 
 1. Click-level UI automation (mouse interactions) is still not part of PR gating.
 2. Extension Host scenarios should expand to include watcher-driven reply rendering and reconciliation edit-path assertions.
+3. Known upstream/editor limitations are tracked in `docs/known-limitations.md` and should be treated as non-regressions unless the upstream behavior changes.
 
 ## Merge Gate
 

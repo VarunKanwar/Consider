@@ -120,6 +120,7 @@ Use ESLint and Prettier with standard TypeScript configs. Run `npm run lint` and
 ## Testing expectations
 
 Use `docs/testing-strategy.md` as the repository-wide testing source of truth for merge/release gates and integration-test roadmap decisions.
+Use `docs/known-limitations.md` as the single source of truth for confirmed product limitations; other docs should link to it rather than restating limitation details.
 
 Every phase must include tests. What "tests" means varies by phase:
 

@@ -481,6 +481,7 @@ The architecture accommodates MCP later because the CLI and a future MCP server 
 ## 9. Open Questions and Known Complexities
 
 These are issues identified during design that need further investigation or decisions during implementation.
+User-facing and implementation-facing limitations that are already confirmed are tracked in one place: `docs/known-limitations.md`.
 
 ### 9.1 Anchor Drift in the Extension UI
 

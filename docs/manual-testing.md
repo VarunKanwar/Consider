@@ -61,6 +61,7 @@
 If the `+` icon never appears:
 - Ensure `"editor.glyphMargin": true` in settings.
 - Ensure the file is on disk (not an untitled buffer) and the extension host window has an open workspace folder.
+- For known VS Code rendering edge cases (for example, duplicate `+` glyphs with word wrap), see `docs/known-limitations.md`.
 
 ## Test 4: Reply to a Comment
 

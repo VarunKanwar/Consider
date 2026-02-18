@@ -29,6 +29,8 @@ Three components share a single JSON store via the filesystem. The extension wri
 
 Under active development. See `docs/spec.md` for the full technical specification and `docs/progress.md` for current build status.
 
+Known product constraints and upstream limitations are tracked in one place: `docs/known-limitations.md`.
+
 ## Quick Start (Current)
 
 1. Open a workspace in VS Code with the Feedback Loop extension active.
@@ -48,6 +50,7 @@ Notes:
 
 - **`docs/spec.md`** — Complete technical specification: problem statement, architecture, data model, anchoring algorithm, agent integration, build phases.
 - **`docs/progress.md`** — Build log tracking phase completion and implementation decisions.
+- **`docs/known-limitations.md`** — Canonical list of current limitations and upstream constraints.
 - **`docs/manual-testing.md`** — Step-by-step manual testing procedures.
 - **`docs/testing-strategy.md`** — Repository-wide testing policy, merge gate, and integration-test roadmap.
 - **`AGENTS.md`** — Development instructions for AI coding agents working on this repo.
