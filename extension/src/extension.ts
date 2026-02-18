@@ -96,15 +96,15 @@ function truncateTreeText(value: string, max = 90): string {
 }
 
 function workflowTagText(state: FeedbackComment['workflowState']): string {
-  return state === 'resolved' ? 'Resolved' : '';
+  return state === 'resolved' ? '✓ Resolved' : '';
 }
 
 function anchorTagText(state: FeedbackComment['anchorState']): string {
   if (state === 'stale') {
-    return 'Stale';
+    return '△ Stale';
   }
   if (state === 'orphaned') {
-    return 'Orphaned';
+    return '⊘ Orphaned';
   }
   return '';
 }
@@ -371,18 +371,6 @@ class FeedbackLoopController {
           this.handleUnresolve(thread);
         }
       )
-    );
-
-    // Status indicator commands are intentionally no-op; they exist to surface
-    // native codicon status glyphs in the thread title action area.
-    this.disposables.push(
-      vscode.commands.registerCommand('feedback-loop.statusResolved', () => {})
-    );
-    this.disposables.push(
-      vscode.commands.registerCommand('feedback-loop.statusStale', () => {})
-    );
-    this.disposables.push(
-      vscode.commands.registerCommand('feedback-loop.statusOrphaned', () => {})
     );
 
     // Delete comment
