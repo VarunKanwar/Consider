@@ -122,6 +122,10 @@ function statusTagText(comment: FeedbackComment): string {
   return parts.join(' • ');
 }
 
+function threadContextValue(comment: FeedbackComment): string {
+  return `feedback-thread-${comment.workflowState}-${comment.anchorState}`;
+}
+
 class FeedbackCommentsTreeProvider
   implements vscode.TreeDataProvider<FeedbackTreeNode> {
   private readonly onDidChangeTreeDataEmitter = new vscode.EventEmitter<
@@ -367,6 +371,18 @@ class FeedbackLoopController {
           this.handleUnresolve(thread);
         }
       )
+    );
+
+    // Status indicator commands are intentionally no-op; they exist to surface
+    // native codicon status glyphs in the thread title action area.
+    this.disposables.push(
+      vscode.commands.registerCommand('feedback-loop.statusResolved', () => {})
+    );
+    this.disposables.push(
+      vscode.commands.registerCommand('feedback-loop.statusStale', () => {})
+    );
+    this.disposables.push(
+      vscode.commands.registerCommand('feedback-loop.statusOrphaned', () => {})
     );
 
     // Delete comment
@@ -1829,15 +1845,14 @@ class FeedbackLoopController {
     const statusText = statusTagText(comment);
     thread.label = statusText.length > 0 ? `Feedback • ${statusText}` : 'Feedback';
     thread.canReply = comment.workflowState !== 'resolved';
+    thread.contextValue = threadContextValue(comment);
 
     if (comment.workflowState === 'resolved') {
       thread.state = vscode.CommentThreadState.Resolved;
-      thread.contextValue = 'feedback-thread-resolved';
       return;
     }
 
     thread.state = vscode.CommentThreadState.Unresolved;
-    thread.contextValue = 'feedback-thread-open';
   }
 
   /**

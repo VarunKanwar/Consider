@@ -39,6 +39,21 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "feedback-loop.statusResolved",
+        "title": "Status: Resolved",
+        "icon": "$(pass)"
+      },
+      {
+        "command": "feedback-loop.statusStale",
+        "title": "Status: Stale",
+        "icon": "$(warning)"
+      },
+      {
+        "command": "feedback-loop.statusOrphaned",
+        "title": "Status: Orphaned",
+        "icon": "$(circle-slash)"
+      },
+      {
         "command": "feedback-loop.deleteComment",
         "title": "Delete",
         "icon": "$(trash)"
@@ -80,14 +95,29 @@
     "menus": {
       "comments/commentThread/title": [
         {
+          "command": "feedback-loop.statusResolved",
+          "group": "status@1",
+          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-resolved-/"
+        },
+        {
+          "command": "feedback-loop.statusStale",
+          "group": "status@2",
+          "when": "commentController == feedback-loop && commentThread =~ /-stale$/"
+        },
+        {
+          "command": "feedback-loop.statusOrphaned",
+          "group": "status@3",
+          "when": "commentController == feedback-loop && commentThread =~ /-orphaned$/"
+        },
+        {
           "command": "feedback-loop.resolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread == feedback-thread-open"
+          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-open-/"
         },
         {
           "command": "feedback-loop.unresolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread == feedback-thread-resolved"
+          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-resolved-/"
         }
       ],
       "comments/commentThread/context": [
@@ -99,17 +129,17 @@
         {
           "command": "feedback-loop.replyToComment",
           "group": "inline",
-          "when": "commentController == feedback-loop && !commentThreadIsEmpty && commentThread == feedback-thread-open"
+          "when": "commentController == feedback-loop && !commentThreadIsEmpty && commentThread =~ /^feedback-thread-open-/"
         },
         {
           "command": "feedback-loop.resolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread == feedback-thread-open"
+          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-open-/"
         },
         {
           "command": "feedback-loop.unresolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread == feedback-thread-resolved"
+          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-resolved-/"
         }
       ],
       "comments/comment/title": [
@@ -124,6 +154,20 @@
           "command": "feedback-loop.toggleCommentThreadFromTree",
           "group": "inline",
           "when": "view == feedback-loop.comments && viewItem =~ /feedback-comment-/"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "feedback-loop.statusResolved",
+          "when": "false"
+        },
+        {
+          "command": "feedback-loop.statusStale",
+          "when": "false"
+        },
+        {
+          "command": "feedback-loop.statusOrphaned",
+          "when": "false"
         }
       ]
     }

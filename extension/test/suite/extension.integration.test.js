@@ -439,7 +439,7 @@ suite('Feedback Loop Extension Host', () => {
     assert.equal(comment.anchorState, 'stale');
     await waitFor(
       () =>
-        thread.contextValue === 'feedback-thread-open' &&
+        thread.contextValue === 'feedback-thread-open-stale' &&
         typeof thread.label === 'string' &&
         thread.label.includes('Stale'),
       'thread stale status presentation'
@@ -453,7 +453,7 @@ suite('Feedback Loop Extension Host', () => {
     assert.equal(comment.anchorState, 'orphaned');
     await waitFor(
       () =>
-        thread.contextValue === 'feedback-thread-open' &&
+        thread.contextValue === 'feedback-thread-open-orphaned' &&
         typeof thread.label === 'string' &&
         thread.label.includes('Orphaned'),
       'thread orphaned status presentation'
