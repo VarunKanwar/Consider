@@ -30,7 +30,6 @@ const AGENT_AUTHOR: vscode.CommentAuthorInformation = {
   name: 'Agent',
 };
 
-const FULL_LINE_END_CHARACTER = Number.MAX_SAFE_INTEGER;
 const MAX_PER_LINE_COMMENTING_RANGES = 5000;
 
 /**
@@ -217,22 +216,7 @@ class FeedbackLoopController {
         document: vscode.TextDocument,
         _token: vscode.CancellationToken
       ) => {
-        if (document.lineCount === 0) {
-          return [];
-        }
-
-        // Use one logical range per line so wrapped lines don't duplicate icons.
-        if (document.lineCount <= MAX_PER_LINE_COMMENTING_RANGES) {
-          const ranges: vscode.Range[] = [];
-          for (let line = 0; line < document.lineCount; line++) {
-            const endChar = document.lineAt(line).range.end.character;
-            ranges.push(new vscode.Range(line, 0, line, endChar));
-          }
-          return ranges;
-        }
-
-        // Fallback for very large files.
-        return [new vscode.Range(0, 0, document.lineCount - 1, FULL_LINE_END_CHARACTER)];
+        return this.buildCommentingRanges(document);
       },
     };
     // Set the reaction handler to null to disable reactions UI
@@ -370,6 +354,23 @@ class FeedbackLoopController {
         this.handleReconcileAll();
       })
     );
+
+    if (this.context.extensionMode === vscode.ExtensionMode.Test) {
+      this.disposables.push(
+        vscode.commands.registerCommand('feedback-loop.debug.commentingRanges', () => {
+          const active = vscode.window.activeTextEditor;
+          if (!active) {
+            return [];
+          }
+          return this.buildCommentingRanges(active.document).map((range) => ({
+            startLine: range.start.line,
+            startCharacter: range.start.character,
+            endLine: range.end.line,
+            endCharacter: range.end.character,
+          }));
+        })
+      );
+    }
   }
 
   // --- Comment handlers ---
@@ -1562,6 +1563,25 @@ class FeedbackLoopController {
 
   // --- Helpers ---
 
+  private buildCommentingRanges(document: vscode.TextDocument): vscode.Range[] {
+    if (document.lineCount === 0) {
+      return [];
+    }
+
+    // Keep range anchors zero-length at line starts to avoid duplicate
+    // glyphs on visually wrapped lines.
+    if (document.lineCount <= MAX_PER_LINE_COMMENTING_RANGES) {
+      const ranges: vscode.Range[] = [];
+      for (let line = 0; line < document.lineCount; line++) {
+        ranges.push(new vscode.Range(line, 0, line, 0));
+      }
+      return ranges;
+    }
+
+    // Fallback for very large files.
+    return [new vscode.Range(0, 0, document.lineCount - 1, 0)];
+  }
+
   private buildDocumentLineRange(
     document: vscode.TextDocument,
     startLine: number,
@@ -1569,14 +1589,13 @@ class FeedbackLoopController {
   ): vscode.Range {
     const clampedStart = Math.max(0, Math.min(startLine, document.lineCount - 1));
     const clampedEnd = Math.max(clampedStart, Math.min(endLine, document.lineCount - 1));
-    const endChar = document.lineAt(clampedEnd).range.end.character;
-    return new vscode.Range(clampedStart, 0, clampedEnd, endChar);
+    return new vscode.Range(clampedStart, 0, clampedEnd, 0);
   }
 
   private buildStoredAnchorRange(startLine: number, endLine: number): vscode.Range {
     const start = Math.max(0, startLine - 1);
     const end = Math.max(start, endLine - 1);
-    return new vscode.Range(start, 0, end, FULL_LINE_END_CHARACTER);
+    return new vscode.Range(start, 0, end, 0);
   }
 
   private isCommentReply(value: unknown): value is vscode.CommentReply {

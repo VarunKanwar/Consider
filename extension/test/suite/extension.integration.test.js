@@ -149,6 +149,35 @@ suite('Feedback Loop Extension Host', () => {
     assert.ok(!fs.existsSync(path.join(root, '.codex')));
   });
 
+  test('commenting ranges are one zero-length anchor per source line', async () => {
+    const root = workspaceRoot();
+    const samplePath = path.join(root, 'src', 'sample.ts');
+    fs.writeFileSync(
+      samplePath,
+      [
+        "const veryLongLine = 'this line is intentionally long to wrap in the editor viewport and exercise gutter range behavior for comment affordances';",
+        'const secondLine = 2;',
+        '',
+      ].join('\n'),
+      'utf-8'
+    );
+
+    const sampleUri = vscode.Uri.file(samplePath);
+    const doc = await vscode.workspace.openTextDocument(sampleUri);
+    await vscode.window.showTextDocument(doc);
+
+    const ranges = await vscode.commands.executeCommand('feedback-loop.debug.commentingRanges');
+    assert.ok(Array.isArray(ranges));
+    assert.equal(ranges.length, doc.lineCount);
+
+    ranges.forEach((range, line) => {
+      assert.equal(range.startLine, line);
+      assert.equal(range.endLine, line);
+      assert.equal(range.startCharacter, 0);
+      assert.equal(range.endCharacter, 0);
+    });
+  });
+
   test('add comment command writes a store record from command payload path', async () => {
     const root = workspaceRoot();
     await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
