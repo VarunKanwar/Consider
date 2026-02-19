@@ -1898,31 +1898,87 @@ class FeedbackLoopController {
 
 let controller: FeedbackLoopController | undefined;
 
+const WORKSPACE_REQUIRED_COMMANDS = [
+  'feedback-loop.addComment',
+  'feedback-loop.setupAgentIntegration',
+  'feedback-loop.uninstallAgentIntegration',
+  'feedback-loop.showAllComments',
+  'feedback-loop.archiveResolved',
+  'feedback-loop.reconcileAll',
+  'feedback-loop.toggleCommentThreadFromTree',
+] as const;
+
+function hasWorkspaceFolder(): boolean {
+  const folders = vscode.workspace.workspaceFolders;
+  return Array.isArray(folders) && folders.length > 0;
+}
+
+function registerWorkspaceWarningCommands(): vscode.Disposable[] {
+  const warning = 'Feedback Loop requires an open workspace folder.';
+  return WORKSPACE_REQUIRED_COMMANDS.map((cmd) =>
+    vscode.commands.registerCommand(cmd, () => {
+      void vscode.window.showWarningMessage(warning);
+    })
+  );
+}
+
+function initializeController(context: vscode.ExtensionContext): void {
+  controller = new FeedbackLoopController(context);
+  context.subscriptions.push(
+    new vscode.Disposable(() => {
+      controller?.dispose();
+      controller = undefined;
+    })
+  );
+}
+
 export function activate(context: vscode.ExtensionContext): void {
-  try {
-    controller = new FeedbackLoopController(context);
-    context.subscriptions.push({ dispose: () => controller?.dispose() });
-  } catch (e) {
-    // No workspace folder open — register commands that show a warning
-    const cmds = [
-      'feedback-loop.addComment',
-      'feedback-loop.setupAgentIntegration',
-      'feedback-loop.uninstallAgentIntegration',
-      'feedback-loop.showAllComments',
-      'feedback-loop.archiveResolved',
-      'feedback-loop.reconcileAll',
-      'feedback-loop.toggleCommentThreadFromTree',
-    ];
-    for (const cmd of cmds) {
-      context.subscriptions.push(
-        vscode.commands.registerCommand(cmd, () => {
-          vscode.window.showWarningMessage(
-            'Feedback Loop requires an open workspace folder.'
-          );
-        })
-      );
+  let warningCommandDisposables: vscode.Disposable[] = [];
+  const disposeWarningCommands = (): void => {
+    for (const disposable of warningCommandDisposables) {
+      disposable.dispose();
     }
+    warningCommandDisposables = [];
+  };
+
+  const tryInitializeForWorkspace = (): boolean => {
+    if (controller) {
+      return true;
+    }
+    if (!hasWorkspaceFolder()) {
+      return false;
+    }
+    try {
+      initializeController(context);
+      disposeWarningCommands();
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (message === 'No workspace folder open.') {
+        return false;
+      }
+      void vscode.window.showErrorMessage(`Feedback Loop failed to activate: ${message}`);
+      return false;
+    }
+  };
+
+  if (tryInitializeForWorkspace()) {
+    return;
   }
+
+  warningCommandDisposables = registerWorkspaceWarningCommands();
+  context.subscriptions.push(
+    new vscode.Disposable(() => {
+      disposeWarningCommands();
+    })
+  );
+
+  const workspaceChangeListener = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+    if (tryInitializeForWorkspace()) {
+      workspaceChangeListener.dispose();
+    }
+  });
+  context.subscriptions.push(workspaceChangeListener);
 }
 
 export function deactivate(): void {
