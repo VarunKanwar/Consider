@@ -456,6 +456,7 @@ When the developer runs "Feedback: Setup Agent Integration":
 
 1. Create `.feedback/` directory if it doesn't exist.
 2. Create `.feedback/bin/` and copy/generate the CLI tool files.
+   - The extension package must carry these CLI/shared runtime artifacts so setup works the same from an installed VSIX as from a local development checkout.
 3. Write/update `.feedback/config.json` with tracked skill install locations (target, scope, absolute path) so uninstall can remove exactly what setup installed.
    - Repeated setup runs must merge this tracking idempotently.
 4. Show a single setup panel (extension-first onboarding) with explicit choices:
@@ -602,6 +603,10 @@ The recommended build order, with each step producing a usable increment:
 **Phase 7: Onboarding and installation UX** — Replace implicit setup side effects with a guided setup flow in the extension. Keep `.feedback/` at project root for v1, make agent integration writes explicit opt-in, and improve first-run discoverability/documentation for end users.
 
 **Phase 8: Offboarding and uninstall UX** — Add a dedicated uninstall flow that can remove Feedback Loop runtime files and installed skills safely. Track install locations at setup time and use that tracking for deterministic cleanup.
+
+**Phase 9: Thread state model split** — Separate workflow lifecycle from anchor reliability by splitting state into `workflowState` (`open|resolved`) and `anchorState` (`anchored|stale|orphaned`). Ensure CLI and extension render and filter both dimensions consistently.
+
+**Phase 10: UI smoke automation** — Add click-level UI smoke tests using standard VS Code UI automation tooling (`vscode-extension-tester`) for canonical user flows. Gate these tests in CI on every push/PR, and upload artifacts (screenshots/logs) on failures.
 
 ---
 

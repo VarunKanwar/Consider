@@ -322,6 +322,10 @@ class FeedbackLoopController {
     return folders[0].uri.fsPath;
   }
 
+  private getRuntimeCliSourceDir(): string {
+    return path.join(this.context.extensionPath, 'runtime', 'cli');
+  }
+
   // --- Commands ---
 
   private registerCommands(): void {
@@ -1072,7 +1076,7 @@ class FeedbackLoopController {
     try {
       if (this.context.extensionMode === vscode.ExtensionMode.Test) {
         const result = runSetupAgentIntegration(this.projectRoot, {
-          cliSourceDir: path.resolve(this.context.extensionPath, '..', 'cli'),
+          cliSourceDir: this.getRuntimeCliSourceDir(),
           addGitignoreEntry: true,
           integrationTargets: [],
         });
@@ -1089,7 +1093,7 @@ class FeedbackLoopController {
       const integrationTargets = integrationInstalls.map((install) => install.target);
 
       const result = runSetupAgentIntegration(this.projectRoot, {
-        cliSourceDir: path.resolve(this.context.extensionPath, '..', 'cli'),
+        cliSourceDir: this.getRuntimeCliSourceDir(),
         addGitignoreEntry,
         integrationTargets,
         integrationInstalls,

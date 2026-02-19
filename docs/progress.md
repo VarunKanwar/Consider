@@ -576,3 +576,65 @@
 ### What's known to be incomplete
 
 1. **No dedicated unread triage command yet:** unseen support exists via `list --unseen`, but no separate inbox command is implemented.
+
+---
+
+## Phase 10: UI Smoke Automation
+
+**Status:** Complete
+
+### What was built
+
+1. **UI smoke harness scaffolding** (`extension/test-ui/`)
+   - Added `vscode-extension-tester` based runner at `extension/test-ui/runSmoke.js`.
+   - Runner provisions an isolated fixture workspace copy per run, executes smoke tests, and keeps artifacts on failures.
+   - Runner now uses an isolated extension directory (`extension/test-ui/.cache/extensions`) so global user extensions do not affect smoke runs.
+   - Added deterministic smoke settings file: `extension/test-ui/settings.json`.
+
+2. **Smoke fixture workspace** (`extension/test-ui/fixtures/workspace/`)
+   - Added minimal source fixture (`src/sample.ts`) used by click-level smoke flows.
+
+3. **Canonical click-path smoke scenario** (`extension/test-ui/suite/smoke.test.js`)
+   - Seeds one open comment in `.feedback/store.json`.
+   - Clicks the unresolved thread glyph in the editor gutter.
+   - Clicks `Resolve` in the inline thread widget.
+   - Asserts persisted workflow transition to `resolved` in `.feedback/store.json`.
+
+4. **Scripts and CI wiring**
+   - Added extension script: `npm run test:ui:smoke`.
+   - Added root scripts:
+     - `npm run test:extension:ui:smoke`
+     - updated `npm run test:full` to include UI smoke.
+   - Added CI job `CI / ui-smoke` in `.github/workflows/ci.yml` for push/PR.
+   - Added failure artifact upload for UI smoke (`extension/test-ui/.artifacts`).
+
+5. **Repo hygiene**
+   - Added `extension/test-ui/.artifacts/` to `.gitignore`.
+   - Added `extension/test-ui/.cache/` to `.gitignore`.
+
+6. **Packaged-extension runtime hardening** (`extension/runtime/**`, `extension/scripts/sync-runtime.js`, `extension/src/reconcile.ts`, `extension/src/extension.ts`)
+   - Bundled CLI/shared runtime assets inside the extension package under `runtime/`.
+   - Added `sync:runtime` build step so packaged VSIX has the same CLI/shared runtime files setup depends on.
+   - Updated extension runtime imports and setup source paths to use bundled runtime assets rather than repo-sibling paths.
+
+### What was tested
+
+1. `npm test` (passes).
+2. `npm run test:extension:host` (passes).
+3. `npm run test:extension:ui:smoke` (passes).
+4. `npm run test:full` (passes).
+
+### Implementation decisions not in the spec
+
+1. **UI smoke uses explicit non-interactive VSIX packaging:** the smoke runner packages with `@vscode/vsce` API options to avoid interactive prompts and to skip secret-lint gating for test-only packaging (CI-safe), then installs that VSIX via `vscode-extension-tester`.
+2. **Isolated workspace-first execution:** smoke tests never run against repo working files; they operate on a copied fixture workspace.
+3. **Isolated extensions runtime for smoke:** smoke runs do not load global user extensions; they use a dedicated test extensions directory.
+4. **Artifact retention policy:** run directory is deleted on success and retained on failure for screenshot/log triage.
+5. **Packaging exclusions hardened:** extension packaging now uses `.vscodeignore` to exclude test/dev artifacts (including `test-ui/**`) so UI smoke runtime data cannot bloat/break VSIX creation.
+6. **Cache-first test runtime:** UI smoke now uses a stable cache directory (`extension/test-ui/.cache`) so local and CI runs can reuse downloaded VS Code + ChromeDriver binaries across runs.
+7. **Self-contained VSIX runtime assets:** the extension bundle carries the CLI/shared runtime files required for setup and reconciliation so installed VSIX behavior matches development behavior.
+
+### What's known to be incomplete
+
+1. **Coverage breadth:** only one canonical click-flow is automated today; additional high-value UX interactions should be added incrementally.
+2. **Setup webview click coverage not yet gated:** setup wizard interactions are deferred to future UI-smoke expansion once a stable webview selector strategy is in place.

@@ -4,6 +4,10 @@
   "description": "Inline bidirectional feedback between developers and AI agents",
   "version": "0.1.0",
   "publisher": "feedback-loop",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VarunKanwar/feedback-loop.git"
+  },
   "engines": {
     "vscode": "^1.82.0"
   },
@@ -129,17 +133,21 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p ./",
+    "sync:runtime": "node ./scripts/sync-runtime.js",
+    "compile": "npm run sync:runtime && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "test:host": "npm run compile && node ./test/runTest.js",
+    "test:ui:smoke": "node ./test-ui/runSmoke.js",
     "lint": "eslint src --ext ts",
-    "pretest": "npm run compile"
+    "pretest": "npm run compile",
+    "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {
-    "@vscode/test-electron": "^2.4.1",
     "@types/node": "^18.0.0",
     "@types/vscode": "^1.82.0",
+    "@vscode/test-electron": "^2.4.1",
     "mocha": "^10.8.2",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vscode-extension-tester": "^8.22.0"
   }
 }

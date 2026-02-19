@@ -7,3 +7,5 @@ test/out/
 *.tgz
 .DS_Store
 extension/.vscode-test/
+extension/test-ui/.artifacts/
+extension/test-ui/.cache/

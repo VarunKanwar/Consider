@@ -11,7 +11,8 @@
     "test:extension": "npm run test:prepare && npm run test:extension:run",
     "test:extension:run": "node --test test/out/extension/*.test.js",
     "test:extension:host": "cd extension && npm run test:host",
-    "test:full": "npm test && npm run test:extension:host",
+    "test:extension:ui:smoke": "cd extension && npm run test:ui:smoke",
+    "test:full": "npm test && npm run test:extension:host && npm run test:extension:ui:smoke",
     "compile": "cd extension && npm run compile"
   }
 }

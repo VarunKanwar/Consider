@@ -2,7 +2,7 @@
 
 This document defines the repository-wide testing strategy so implementation and review standards stay consistent across agents, sessions, and contributors.
 
-This strategy is formalized as **Phase 6: Testing hardening** in the project build order.
+This strategy is formalized across **Phase 6: Testing hardening** and **Phase 10: UI smoke automation** in the project build order.
 
 ## Goals
 
@@ -61,20 +61,33 @@ This strategy is formalized as **Phase 6: Testing hardening** in the project bui
 - Run with:
   - `npm run test:extension:host`
 
+### Layer 5: UI smoke tests (automated, required in CI)
+
+- Location: `extension/test-ui/`
+- Harness: `vscode-extension-tester` (Selenium WebDriver over VS Code desktop)
+- Scope:
+  - canonical comment workflow smoke path with real clicks
+  - tree selection + thread action button click (`Resolve`)
+- Run with:
+  - `npm run test:extension:ui:smoke`
+
 Isolation policy:
 
 1. Host tests run against a temporary copy of `extension/test/fixtures/workspace/` (never against tracked fixture files directly).
 2. Host tests use temporary VS Code `--user-data-dir` and `--extensions-dir` paths per run.
 3. Temporary host-test directories are cleaned up after each run.
+4. UI smoke runs against a copied fixture workspace plus a dedicated extensions directory (`extension/test-ui/.cache/extensions`) so user-installed extensions do not affect results.
 
 Notes:
 
 1. First run may download a VS Code test build from `update.code.visualstudio.com`.
 2. In offline environments this suite may fail to launch even if test code is correct.
+3. UI smoke first run also downloads ChromeDriver via `vscode-extension-tester`; use prewarmed caches or a network-enabled environment.
+4. UI smoke uses persistent cache directory `extension/test-ui/.cache` (and CI cache restore) to avoid repeated VS Code/ChromeDriver downloads.
 
 ## Remaining Gaps
 
-1. Click-level UI automation (mouse interactions) is still not part of PR gating.
+1. UI smoke currently covers a minimal canonical path; expand coverage incrementally for additional high-risk interactions.
 2. Extension Host scenarios should expand to include watcher-driven reply rendering and reconciliation edit-path assertions.
 3. Known upstream/editor limitations are tracked in `docs/known-limitations.md` and should be treated as non-regressions unless the upstream behavior changes.
 
@@ -82,7 +95,7 @@ Notes:
 
 Before merging:
 
-1. Required GitHub status checks `CI / fast-tests` and `CI / host-integration` must pass.
+1. Required GitHub status checks `CI / fast-tests`, `CI / host-integration`, and `CI / ui-smoke` must pass.
 2. `npm test` must pass locally before opening/updating PR.
 3. If extension UX behavior changed, execute relevant checks in `docs/manual-testing.md`.
 4. Update `docs/progress.md` for phase-level changes and testing evidence.
@@ -92,7 +105,7 @@ Before merging:
 Protect `main` with:
 
 1. Require a pull request before merging.
-2. Require status checks to pass before merging: `CI / fast-tests`, `CI / host-integration`.
+2. Require status checks to pass before merging: `CI / fast-tests`, `CI / host-integration`, `CI / ui-smoke`.
 3. Require branches to be up to date before merging.
 4. Require at least one approving review.
 
@@ -110,3 +123,4 @@ Before a release candidate:
    - CLI list/context/reply/resolve/unresolve (including workflow+anchor filters),
    - extension renders updates.
 4. Run `npm run test:extension:host` in a network-enabled environment.
+5. Run `npm run test:extension:ui:smoke` in a network-enabled environment.

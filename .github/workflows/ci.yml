@@ -58,3 +58,41 @@ jobs:
 
       - name: Run extension host integration tests
         run: xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npm run test:extension:host
+
+  ui-smoke:
+    name: ui-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs: fast-tests
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+
+      - name: Install extension dependencies
+        run: npm --prefix extension ci
+
+      - name: Restore UI smoke cache
+        uses: actions/cache@v4
+        with:
+          path: extension/test-ui/.cache
+          key: ui-smoke-${{ runner.os }}-vscode-1.109.4-extester-v1
+
+      - name: Run UI smoke tests
+        env:
+          FEEDBACK_LOOP_UI_CODE_VERSION: "1.109.4"
+        run: xvfb-run --auto-servernum --server-args="-screen 0 1280x1024x24" npm run test:extension:ui:smoke
+
+      - name: Upload UI smoke artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-smoke-artifacts
+          path: extension/test-ui/.artifacts
+          if-no-files-found: ignore

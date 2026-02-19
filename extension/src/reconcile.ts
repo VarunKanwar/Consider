@@ -24,8 +24,8 @@ type SharedReconcileModule = {
 };
 
 // Keep CLI and extension reconciliation behavior identical by delegating to the
-// same shared implementation.
-const sharedReconcile = require('../../shared/reconcile.js') as SharedReconcileModule;
+// same shared implementation bundled with the extension package.
+const sharedReconcile = require('../runtime/shared/reconcile.js') as SharedReconcileModule;
 
 export function reconcileStoreForExtension(
   projectRoot: string,
