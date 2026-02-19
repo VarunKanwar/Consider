@@ -1913,10 +1913,18 @@ function hasWorkspaceFolder(): boolean {
   return Array.isArray(folders) && folders.length > 0;
 }
 
-function registerWorkspaceWarningCommands(): vscode.Disposable[] {
+function registerWorkspaceWarningCommands(
+  tryInitializeForWorkspace: () => boolean
+): vscode.Disposable[] {
   const warning = 'Feedback Loop requires an open workspace folder.';
   return WORKSPACE_REQUIRED_COMMANDS.map((cmd) =>
-    vscode.commands.registerCommand(cmd, () => {
+    vscode.commands.registerCommand(cmd, async (...args: unknown[]) => {
+      // The workspace can arrive after activation starts on slower machines.
+      // If initialization now succeeds, reroute this invocation to the real command.
+      if (tryInitializeForWorkspace()) {
+        await vscode.commands.executeCommand(cmd, ...args);
+        return;
+      }
       void vscode.window.showWarningMessage(warning);
     })
   );
@@ -1933,6 +1941,7 @@ function initializeController(context: vscode.ExtensionContext): void {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  let tryInitializeForWorkspace: (() => boolean) | undefined;
   let warningCommandDisposables: vscode.Disposable[] = [];
   const disposeWarningCommands = (): void => {
     for (const disposable of warningCommandDisposables) {
@@ -1941,7 +1950,7 @@ export function activate(context: vscode.ExtensionContext): void {
     warningCommandDisposables = [];
   };
 
-  const tryInitializeForWorkspace = (): boolean => {
+  tryInitializeForWorkspace = (): boolean => {
     if (controller) {
       return true;
     }
@@ -1966,7 +1975,9 @@ export function activate(context: vscode.ExtensionContext): void {
     return;
   }
 
-  warningCommandDisposables = registerWorkspaceWarningCommands();
+  warningCommandDisposables = registerWorkspaceWarningCommands(
+    tryInitializeForWorkspace
+  );
   context.subscriptions.push(
     new vscode.Disposable(() => {
       disposeWarningCommands();
@@ -1979,6 +1990,11 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   });
   context.subscriptions.push(workspaceChangeListener);
+
+  // Workspace folders can appear between the initial check and listener wiring.
+  if (tryInitializeForWorkspace()) {
+    workspaceChangeListener.dispose();
+  }
 }
 
 export function deactivate(): void {
