@@ -96,3 +96,4 @@ jobs:
           name: ui-smoke-artifacts
           path: extension/test-ui/.artifacts
           if-no-files-found: ignore
+          include-hidden-files: true

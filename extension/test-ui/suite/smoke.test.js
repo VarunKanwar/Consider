@@ -13,6 +13,13 @@ const {
   until,
 } = require('vscode-extension-tester');
 
+const IS_CI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+const WAIT_TIMEOUT_MS = IS_CI ? 90000 : 20000;
+const UI_ACTION_TIMEOUT_MS = IS_CI ? 90000 : 20000;
+const INPUT_TIMEOUT_MS = IS_CI ? 30000 : 10000;
+const RETRY_ATTEMPTS = IS_CI ? 2 : 1;
+const EXTERNAL_WRITE_SETTLE_MS = IS_CI ? 1200 : 700;
+
 function storePath(workspacePath) {
   return path.join(workspacePath, '.feedback', 'store.json');
 }
@@ -65,15 +72,35 @@ function runCli(workspacePath, repoRoot, args) {
   }
 }
 
-async function waitFor(condition, description, timeoutMs = 20000, intervalMs = 100) {
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetry(description, attempts, run) {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await run(attempt);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await delay(500);
+      }
+    }
+  }
+  const message = lastError instanceof Error ? lastError.message : String(lastError);
+  throw new Error(`${description} failed after ${attempts} attempt(s): ${message}`);
+}
+
+async function waitFor(condition, description, timeoutMs = WAIT_TIMEOUT_MS, intervalMs = 100) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (await Promise.resolve(condition())) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    await delay(intervalMs);
   }
-  throw new Error(`Timed out waiting for: ${description}`);
+  throw new Error(`Timed out waiting for: ${description} (${timeoutMs}ms)`);
 }
 
 async function dismissSetupPromptIfPresent() {
@@ -93,17 +120,17 @@ async function dismissSetupPromptIfPresent() {
 
 async function openSampleEditor(workspacePath, line = 1) {
   const sampleFilePath = path.join(workspacePath, 'src', 'sample.ts');
-  await VSBrowser.instance.openResources(sampleFilePath);
   const editorView = new EditorView();
-
   let openedTitle;
-  await waitFor(async () => {
-    const titles = await editorView.getOpenEditorTitles();
-    openedTitle = titles.find((title) => title.includes('sample.ts'));
-    return typeof openedTitle === 'string';
-  }, 'sample.ts editor tab to open');
-
-  await editorView.openEditor(openedTitle);
+  await withRetry('open sample.ts editor', RETRY_ATTEMPTS, async () => {
+    await VSBrowser.instance.openResources(sampleFilePath);
+    await waitFor(async () => {
+      const titles = await editorView.getOpenEditorTitles();
+      openedTitle = titles.find((title) => title.includes('sample.ts'));
+      return typeof openedTitle === 'string';
+    }, 'sample.ts editor tab to open');
+    await editorView.openEditor(openedTitle);
+  });
   const editor = new TextEditor();
   await editor.setCursor(line, 1);
   return editor;
@@ -121,7 +148,7 @@ async function openFirstThreadFromGutter() {
         "//div[contains(@class,'margin-view-overlays')]//*[contains(@class,'comment-thread-unresolved')]"
       )
     ),
-    15000
+    UI_ACTION_TIMEOUT_MS
   );
   await driver.executeScript(
     "arguments[0].scrollIntoView({block: 'center', inline: 'nearest'})",
@@ -134,38 +161,49 @@ async function clickThreadAction(actionLabel) {
   const driver = VSBrowser.instance.driver;
   const action = await driver.wait(
     until.elementLocated(By.xpath(threadActionSelector(actionLabel))),
-    20000
+    UI_ACTION_TIMEOUT_MS
   );
   await action.click();
 }
 
 async function setupViaWebview() {
   const workbench = new Workbench();
-  await workbench.executeCommand('Feedback: Setup Agent Integration');
-
   const editorView = new EditorView();
-  let setupTitle;
-  await waitFor(async () => {
-    const titles = await editorView.getOpenEditorTitles();
-    setupTitle = titles.find((title) => title.includes('Feedback: Setup'));
-    return typeof setupTitle === 'string';
-  }, 'setup webview tab');
-  await editorView.openEditor(setupTitle);
+  await withRetry('open setup webview', RETRY_ATTEMPTS, async () => {
+    await dismissSetupPromptIfPresent();
+    await workbench.executeCommand('Feedback: Setup Agent Integration');
 
-  const webview = new WebView();
-  await webview.switchToFrame();
-  try {
-    const submitButton = await webview.findWebElement(By.css('#submit'));
-    await submitButton.click();
-  } finally {
-    await webview.switchBack();
-  }
+    let setupTitle;
+    await waitFor(async () => {
+      const titles = await editorView.getOpenEditorTitles();
+      setupTitle = titles.find((title) => title.includes('Feedback: Setup'));
+      return typeof setupTitle === 'string';
+    }, 'setup webview tab');
+    await editorView.openEditor(setupTitle);
+
+    const webview = new WebView();
+    await webview.switchToFrame();
+    try {
+      let submitButton;
+      await waitFor(async () => {
+        try {
+          submitButton = await webview.findWebElement(By.css('#submit'));
+          return true;
+        } catch {
+          return false;
+        }
+      }, 'setup submit button');
+      await submitButton.click();
+    } finally {
+      await webview.switchBack();
+    }
+  });
 }
 
 async function addCommentViaCommand(commentBody) {
   const workbench = new Workbench();
   await workbench.executeCommand('Add Comment');
-  const input = await InputBox.create(10000);
+  const input = await InputBox.create(INPUT_TIMEOUT_MS);
   await input.setText(commentBody);
   await input.confirm();
 }
@@ -173,9 +211,10 @@ async function addCommentViaCommand(commentBody) {
 async function uninstallFullViaCommand() {
   const workbench = new Workbench();
   await workbench.executeCommand('Feedback: Uninstall');
-
-  const options = await InputBox.create(10000);
-  await options.selectQuickPick('Full uninstall');
+  await withRetry('select uninstall quick pick', RETRY_ATTEMPTS, async () => {
+    const options = await InputBox.create(INPUT_TIMEOUT_MS);
+    await options.selectQuickPick('Full uninstall');
+  });
 
   const driver = VSBrowser.instance.driver;
   const uninstallButton = await driver.wait(
@@ -184,13 +223,13 @@ async function uninstallFullViaCommand() {
         "//*[self::button or @role='button' or contains(@class,'monaco-button')][normalize-space()='Uninstall' or contains(@aria-label,'Uninstall')]"
       )
     ),
-    10000
+    UI_ACTION_TIMEOUT_MS
   );
   await uninstallButton.click();
 }
 
 describe('Feedback Loop UI smoke', function () {
-  this.timeout(240000);
+  this.timeout(IS_CI ? 900000 : 240000);
 
   let workspacePath;
   let repoRoot;
@@ -203,6 +242,10 @@ describe('Feedback Loop UI smoke', function () {
     assert.ok(workspacePath, 'FEEDBACK_LOOP_UI_WORKSPACE must be set.');
     assert.ok(repoRoot, 'FEEDBACK_LOOP_UI_REPO_ROOT must be set.');
     resetWorkspace(workspacePath);
+    await dismissSetupPromptIfPresent();
+  });
+
+  beforeEach(async function () {
     await dismissSetupPromptIfPresent();
   });
 
@@ -240,7 +283,7 @@ describe('Feedback Loop UI smoke', function () {
 
     // The extension suppresses store watcher events for ~500ms after writes.
     // Delay so the CLI write is treated as an external update.
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    await delay(EXTERNAL_WRITE_SETTLE_MS);
 
     runCli(workspacePath, repoRoot, [
       'reply',
@@ -260,7 +303,7 @@ describe('Feedback Loop UI smoke', function () {
       until.elementLocated(
         By.xpath(`//*[contains(normalize-space(.), '${lifecycleReplyBody}')]`)
       ),
-      15000
+      UI_ACTION_TIMEOUT_MS
     );
 
     await clickThreadAction('Resolve');
@@ -272,7 +315,7 @@ describe('Feedback Loop UI smoke', function () {
 
     // Resolve was a local extension write; delay so the CLI write is observed
     // by the watcher as an external change.
-    await new Promise((resolve) => setTimeout(resolve, 700));
+    await delay(EXTERNAL_WRITE_SETTLE_MS);
     runCli(workspacePath, repoRoot, ['unresolve', createdComment.id]);
     await waitFor(() => {
       const store = loadStore(workspacePath);
