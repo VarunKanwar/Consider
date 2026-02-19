@@ -66,8 +66,11 @@ This strategy is formalized across **Phase 6: Testing hardening** and **Phase 10
 - Location: `extension/test-ui/`
 - Harness: `vscode-extension-tester` (Selenium WebDriver over VS Code desktop)
 - Scope:
-  - canonical comment workflow smoke path with real clicks
-  - tree selection + thread action button click (`Resolve`)
+  - guided setup flow (setup webview submit + scaffold verification)
+  - add-comment flow via command palette + inline editor thread rendering
+  - watcher-driven external CLI reply rendering
+  - resolve/unresolve lifecycle across UI and CLI transitions
+  - archive resolved + uninstall command workflows
 - Run with:
   - `npm run test:extension:ui:smoke`
 
@@ -87,7 +90,7 @@ Notes:
 
 ## Remaining Gaps
 
-1. UI smoke currently covers a minimal canonical path; expand coverage incrementally for additional high-risk interactions.
+1. UI smoke covers the primary lifecycle paths, but should still expand incrementally for additional high-risk UX interactions (filter toggles, comments panel edge cases, and heavy reconciliation edit flows).
 2. Extension Host scenarios should expand to include watcher-driven reply rendering and reconciliation edit-path assertions.
 3. Known upstream/editor limitations are tracked in `docs/known-limitations.md` and should be treated as non-regressions unless the upstream behavior changes.
 

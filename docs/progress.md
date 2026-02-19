@@ -594,11 +594,13 @@
 2. **Smoke fixture workspace** (`extension/test-ui/fixtures/workspace/`)
    - Added minimal source fixture (`src/sample.ts`) used by click-level smoke flows.
 
-3. **Canonical click-path smoke scenario** (`extension/test-ui/suite/smoke.test.js`)
-   - Seeds one open comment in `.feedback/store.json`.
-   - Clicks the unresolved thread glyph in the editor gutter.
-   - Clicks `Resolve` in the inline thread widget.
-   - Asserts persisted workflow transition to `resolved` in `.feedback/store.json`.
+3. **Expanded end-to-end UI smoke scenarios** (`extension/test-ui/suite/smoke.test.js`)
+   - Runs guided setup from the setup webview submit path and verifies scaffold outputs (`.feedback/store.json`, `.feedback/config.json`, deployed CLI/shared runtime files, and `.gitignore` entry).
+   - Adds a comment through the command palette flow and verifies persisted store records.
+   - Executes CLI reply from the same workspace and asserts watcher-driven thread rendering in the editor.
+   - Exercises resolve/unresolve lifecycle across UI + CLI transitions and verifies workflow state persistence.
+   - Archives resolved comments from the command flow and verifies movement from active store into `.feedback/archive.json`.
+   - Runs full uninstall from the command flow and verifies `.feedback` removal plus `.gitignore` cleanup.
 
 4. **Scripts and CI wiring**
    - Added extension script: `npm run test:ui:smoke`.
@@ -636,5 +638,4 @@
 
 ### What's known to be incomplete
 
-1. **Coverage breadth:** only one canonical click-flow is automated today; additional high-value UX interactions should be added incrementally.
-2. **Setup webview click coverage not yet gated:** setup wizard interactions are deferred to future UI-smoke expansion once a stable webview selector strategy is in place.
+1. **Coverage breadth is still selective:** smoke now covers core lifecycle paths, but additional UX paths (advanced filtering toggles, comments panel edge interactions, and reconciliation-heavy edit sequences) should still be added incrementally.

@@ -40,6 +40,7 @@ async function main() {
 
   process.env.FEEDBACK_LOOP_UI_WORKSPACE = workspacePath;
   process.env.FEEDBACK_LOOP_UI_ARTIFACTS = runRoot;
+  process.env.FEEDBACK_LOOP_UI_REPO_ROOT = path.resolve(extensionRoot, '..');
 
   const exTester = new ExTester(storagePath, undefined, extensionsPath);
   const originalCwd = process.cwd();
