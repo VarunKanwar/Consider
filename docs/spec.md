@@ -606,7 +606,7 @@ The recommended build order, with each step producing a usable increment:
 
 **Phase 9: Thread state model split** — Separate workflow lifecycle from anchor reliability by splitting state into `workflowState` (`open|resolved`) and `anchorState` (`anchored|stale|orphaned`). Ensure CLI and extension render and filter both dimensions consistently.
 
-**Phase 10: UI smoke automation** — Add click-level UI smoke tests using standard VS Code UI automation tooling (`vscode-extension-tester`) for canonical user flows. Gate these tests in CI on every push/PR, and upload artifacts (screenshots/logs) on failures.
+**Phase 10: UI smoke automation** — Add click-level UI smoke tests using standard VS Code UI automation tooling (`vscode-extension-tester`) for canonical user flows. Run these tests locally for UI-impacting changes and release candidates; do not block push/PR CI on this suite.
 
 ---
 

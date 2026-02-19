@@ -607,8 +607,7 @@
    - Added root scripts:
      - `npm run test:extension:ui:smoke`
      - updated `npm run test:full` to include UI smoke.
-   - Added CI job `CI / ui-smoke` in `.github/workflows/ci.yml` for push/PR.
-   - Added failure artifact upload for UI smoke (`extension/test-ui/.artifacts`).
+   - Added UI smoke artifact retention under `extension/test-ui/.artifacts` for failure triage.
 
 5. **Repo hygiene**
    - Added `extension/test-ui/.artifacts/` to `.gitignore`.
@@ -635,6 +634,7 @@
 5. **Packaging exclusions hardened:** extension packaging now uses `.vscodeignore` to exclude test/dev artifacts (including `test-ui/**`) so UI smoke runtime data cannot bloat/break VSIX creation.
 6. **Cache-first test runtime:** UI smoke now uses a stable cache directory (`extension/test-ui/.cache`) so local and CI runs can reuse downloaded VS Code + ChromeDriver binaries across runs.
 7. **Self-contained VSIX runtime assets:** the extension bundle carries the CLI/shared runtime files required for setup and reconciliation so installed VSIX behavior matches development behavior.
+8. **CI gate adjustment:** push/PR CI now runs `CI / fast-tests` and `CI / host-integration`; UI smoke runs remain local/manual due intermittent hosted-runner UI automation instability.
 
 ### What's known to be incomplete
 

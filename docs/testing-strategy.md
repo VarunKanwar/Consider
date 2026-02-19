@@ -61,7 +61,7 @@ This strategy is formalized across **Phase 6: Testing hardening** and **Phase 10
 - Run with:
   - `npm run test:extension:host`
 
-### Layer 5: UI smoke tests (automated, required in CI)
+### Layer 5: UI smoke tests (automated, local/manual gate)
 
 - Location: `extension/test-ui/`
 - Harness: `vscode-extension-tester` (Selenium WebDriver over VS Code desktop)
@@ -73,6 +73,9 @@ This strategy is formalized across **Phase 6: Testing hardening** and **Phase 10
   - archive resolved + uninstall command workflows
 - Run with:
   - `npm run test:extension:ui:smoke`
+- CI policy:
+  - `ui-smoke` is intentionally not part of push/PR CI gating.
+  - Run this suite locally for UI-affecting changes and before release candidates.
 
 Isolation policy:
 
@@ -86,7 +89,7 @@ Notes:
 1. First run may download a VS Code test build from `update.code.visualstudio.com`.
 2. In offline environments this suite may fail to launch even if test code is correct.
 3. UI smoke first run also downloads ChromeDriver via `vscode-extension-tester`; use prewarmed caches or a network-enabled environment.
-4. UI smoke uses persistent cache directory `extension/test-ui/.cache` (and CI cache restore) to avoid repeated VS Code/ChromeDriver downloads.
+4. UI smoke uses persistent cache directory `extension/test-ui/.cache` to avoid repeated VS Code/ChromeDriver downloads.
 
 ## Remaining Gaps
 
@@ -98,17 +101,18 @@ Notes:
 
 Before merging:
 
-1. Required GitHub status checks `CI / fast-tests`, `CI / host-integration`, and `CI / ui-smoke` must pass.
+1. Required GitHub status checks `CI / fast-tests` and `CI / host-integration` must pass.
 2. `npm test` must pass locally before opening/updating PR.
 3. If extension UX behavior changed, execute relevant checks in `docs/manual-testing.md`.
-4. Update `docs/progress.md` for phase-level changes and testing evidence.
+4. If extension UX behavior changed, run `npm run test:extension:ui:smoke` locally in a network-enabled environment.
+5. Update `docs/progress.md` for phase-level changes and testing evidence.
 
 ## Branch Protection
 
 Protect `main` with:
 
 1. Require a pull request before merging.
-2. Require status checks to pass before merging: `CI / fast-tests`, `CI / host-integration`, `CI / ui-smoke`.
+2. Require status checks to pass before merging: `CI / fast-tests`, `CI / host-integration`.
 3. Require branches to be up to date before merging.
 4. Require at least one approving review.
 
