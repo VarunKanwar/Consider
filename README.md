@@ -1,4 +1,4 @@
-# Feedback Loop
+# Consider
 
 A VS Code extension and CLI tool that brings GitHub PR-style inline code review to local development, designed for communication between a human developer and an AI coding agent.
 
@@ -8,7 +8,7 @@ When you're working with an AI coding agent (Claude Code, Codex, OpenCode), revi
 
 ## What this does
 
-Feedback Loop provides an annotation layer that sits *on top of* your code, not inside it:
+Consider provides an annotation layer that sits *on top of* your code, not inside it:
 
 - **Developer** adds inline comments in VS Code, anchored to specific lines or ranges — just like a GitHub PR review.
 - **Agent** reads and replies to those comments via a CLI tool (`feedback-cli`).
@@ -33,7 +33,7 @@ Known product constraints and upstream limitations are tracked in one place: `do
 
 ## Quick Start (Current)
 
-1. Open a workspace in VS Code with the Feedback Loop extension active.
+1. Open a workspace in VS Code with the Consider extension active.
 2. Run **Feedback: Setup Agent Integration** from the Command Palette.
 3. In setup, choose:
    - in one setup panel, whether to add `.feedback/` to `.gitignore`,

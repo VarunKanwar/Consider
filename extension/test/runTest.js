@@ -4,7 +4,7 @@ const path = require('path');
 const { runTests } = require('@vscode/test-electron');
 
 function createIsolatedWorkspace(fixturePath) {
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-loop-host-'));
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'consider-host-'));
   const workspacePath = path.join(tmpRoot, 'workspace');
   fs.cpSync(fixturePath, workspacePath, { recursive: true });
   return { tmpRoot, workspacePath };

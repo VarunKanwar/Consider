@@ -19,18 +19,18 @@ async function main() {
   const fixtureWorkspace = path.resolve(__dirname, 'fixtures', 'workspace');
   const persistedArtifactsRoot = path.resolve(__dirname, '.artifacts');
   const cacheRoot =
-    process.env.FEEDBACK_LOOP_UI_CACHE_DIR || path.resolve(__dirname, '.cache');
+    process.env.CONSIDER_UI_CACHE_DIR || path.resolve(__dirname, '.cache');
   const runId = `run-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`;
-  const runRoot = path.join(os.tmpdir(), 'feedback-loop-ui-smoke', runId);
+  const runRoot = path.join(os.tmpdir(), 'consider-ui-smoke', runId);
   const workspacePath = path.join(runRoot, 'workspace');
   const storagePath = path.join(cacheRoot, 'extester');
   const extensionsPath = path.join(cacheRoot, 'extensions');
   const extensionRoot = path.resolve(__dirname, '..');
-  const vsixPath = path.join(runRoot, 'feedback-loop-ui-smoke.vsix');
+  const vsixPath = path.join(runRoot, 'consider-ui-smoke.vsix');
   const testsGlob = path.resolve(__dirname, 'suite', '*.test.js');
   const settingsPath = path.resolve(__dirname, 'settings.json');
-  const vscodeVersion = process.env.FEEDBACK_LOOP_UI_CODE_VERSION || '1.109.4';
-  const offline = process.env.FEEDBACK_LOOP_UI_SMOKE_OFFLINE === '1';
+  const vscodeVersion = process.env.CONSIDER_UI_CODE_VERSION || '1.109.4';
+  const offline = process.env.CONSIDER_UI_SMOKE_OFFLINE === '1';
 
   resetDir(runRoot);
   ensureDir(cacheRoot);
@@ -38,9 +38,9 @@ async function main() {
   ensureDir(extensionsPath);
   fs.cpSync(fixtureWorkspace, workspacePath, { recursive: true });
 
-  process.env.FEEDBACK_LOOP_UI_WORKSPACE = workspacePath;
-  process.env.FEEDBACK_LOOP_UI_ARTIFACTS = runRoot;
-  process.env.FEEDBACK_LOOP_UI_REPO_ROOT = path.resolve(extensionRoot, '..');
+  process.env.CONSIDER_UI_WORKSPACE = workspacePath;
+  process.env.CONSIDER_UI_ARTIFACTS = runRoot;
+  process.env.CONSIDER_UI_REPO_ROOT = path.resolve(extensionRoot, '..');
 
   const exTester = new ExTester(storagePath, undefined, extensionsPath);
   const originalCwd = process.cwd();

@@ -11,7 +11,7 @@ This strategy is formalized across **Phase 6: Testing hardening** and **Phase 10
    - agent reads/replies via CLI,
    - reply renders inline,
    - anchors remain correct after file edits.
-2. Keep feedback loops fast for daily development.
+2. Keep daily feedback cycles fast for development.
 3. Maintain one explicit quality bar for merge and release decisions.
 
 ## Language Policy

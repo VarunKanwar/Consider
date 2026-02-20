@@ -108,7 +108,7 @@ async function dismissSetupPromptIfPresent() {
   const notifications = await workbench.getNotifications();
   for (const notification of notifications) {
     const message = await notification.getMessage();
-    if (message.includes('Feedback Loop is installed for this workspace')) {
+    if (message.includes('Consider is installed for this workspace')) {
       try {
         await notification.takeAction('Later');
       } catch {
@@ -228,7 +228,7 @@ async function uninstallFullViaCommand() {
   await uninstallButton.click();
 }
 
-describe('Feedback Loop UI smoke', function () {
+describe('Consider UI smoke', function () {
   this.timeout(IS_CI ? 900000 : 240000);
 
   let workspacePath;
@@ -237,10 +237,10 @@ describe('Feedback Loop UI smoke', function () {
   const lifecycleReplyBody = 'UI smoke external CLI reply';
 
   before(async function () {
-    workspacePath = process.env.FEEDBACK_LOOP_UI_WORKSPACE;
-    repoRoot = process.env.FEEDBACK_LOOP_UI_REPO_ROOT;
-    assert.ok(workspacePath, 'FEEDBACK_LOOP_UI_WORKSPACE must be set.');
-    assert.ok(repoRoot, 'FEEDBACK_LOOP_UI_REPO_ROOT must be set.');
+    workspacePath = process.env.CONSIDER_UI_WORKSPACE;
+    repoRoot = process.env.CONSIDER_UI_REPO_ROOT;
+    assert.ok(workspacePath, 'CONSIDER_UI_WORKSPACE must be set.');
+    assert.ok(repoRoot, 'CONSIDER_UI_REPO_ROOT must be set.');
     resetWorkspace(workspacePath);
     await dismissSetupPromptIfPresent();
   });

@@ -190,9 +190,9 @@
    - Ensures shell wrapper remains executable (`chmod 755`).
    - Updates `.gitignore` with `.feedback/` exactly once (no duplicates).
    - Detects agent footprints and installs integrations per spec behavior:
-     - Claude Code skill: `.claude/skills/feedback-loop/SKILL.md`
-     - OpenCode skill: `.opencode/skills/feedback-loop/SKILL.md`
-     - Codex skill: `.codex/skills/feedback-loop/SKILL.md`.
+     - Claude Code skill: `.claude/skills/consider/SKILL.md`
+     - OpenCode skill: `.opencode/skills/consider/SKILL.md`
+     - Codex skill: `.codex/skills/consider/SKILL.md`.
 
 2. **Extension command wiring** (`extension/src/extension.ts`)
    - Replaced Setup command stub with full setup execution.
@@ -228,7 +228,7 @@
 
 ### Implementation decisions not in the spec
 
-- **Codex integration is skills-based:** setup writes a Codex skill at `.codex/skills/feedback-loop/SKILL.md` rather than mutating repo instruction files.
+- **Codex integration is skills-based:** setup writes a Codex skill at `.codex/skills/consider/SKILL.md` rather than mutating repo instruction files.
 - **Footprint detection spans workspace and home:** setup detection checks `.claude/`, `.opencode/`, and `.codex/` in both workspace and home; `.agents/` is still detected as legacy footprint compatibility.
 - **Skill content is shared structure with agent-specific label:** Claude/OpenCode/Codex skill files share core command/convention text, with only installed-for labeling varied.
 - **Setup logic extracted from extension controller:** pure setup behavior lives in `setup.ts` to enable reliable automated tests outside extension host.
@@ -446,9 +446,9 @@
 1. **Setup prompt cadence:** first-run prompt is shown once per workspace state when `.feedback/store.json` is missing.
 2. **Guided defaults:** users can skip integrations explicitly; no implicit integration writes occur.
 3. **Skill install scope:** setup supports project-local and home-level install locations per selected integration in the same run.
-4. **Codex integration path:** Codex setup writes a skill file under `.codex/skills/feedback-loop/SKILL.md`; setup does not append content into `AGENTS.md`/`CLAUDE.md`.
+4. **Codex integration path:** Codex setup writes a skill file under `.codex/skills/consider/SKILL.md`; setup does not append content into `AGENTS.md`/`CLAUDE.md`.
 5. **No custom store path in v1:** `.feedback/` remains fixed at project root for compatibility with existing CLI/store assumptions.
-6. **Agent-specific formatting baseline:** setup now enforces a shared valid frontmatter shape (`name: feedback-loop`, `description: ...`) before markdown content.
+6. **Agent-specific formatting baseline:** setup now enforces a shared valid frontmatter shape (`name: consider`, `description: ...`) before markdown content.
 7. **Module-type invariance in deployed CLI:** setup emits a `.cjs` runtime entrypoint and copies shared modules under `.feedback/shared/` to avoid ESM/CJS and relative-import breakage in target repositories.
 
 ### What's known to be incomplete
@@ -506,7 +506,7 @@
 
 1. **Config path ownership:** uninstall tracking state is stored in `.feedback/config.json` (same gitignored root as store/runtime files).
 2. **Fallback compatibility:** uninstall attempts fallback detection for known skill paths when tracking metadata is missing, to support older installs.
-3. **Safety scope:** uninstall removes only tracked Feedback Loop skill directories (`.../skills/feedback-loop`) and leaves agent root directories in place.
+3. **Safety scope:** uninstall removes only tracked Consider skill directories (`.../skills/consider`) and leaves agent root directories in place.
 
 ### What's known to be incomplete
 

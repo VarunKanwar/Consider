@@ -73,9 +73,9 @@ function countOccurrences(haystack, needle) {
 
 function assertHasSkillFrontmatter(skillContent) {
   assert.ok(skillContent.startsWith('---\n'));
-  assert.ok(skillContent.includes('\nname: feedback-loop\n'));
+  assert.ok(skillContent.includes('\nname: consider\n'));
   assert.ok(skillContent.includes('\ndescription: '));
-  assert.ok(skillContent.includes('\n---\n\n# Feedback Loop\n'));
+  assert.ok(skillContent.includes('\n---\n\n# Consider\n'));
 }
 
 function readJson(relativePath, projectRoot) {
@@ -143,11 +143,11 @@ describe('setup agent integration', () => {
       { target: 'codex', scope: 'project' },
     ]);
     assert.ok(
-      fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
     assert.ok(
-      fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'consider', 'SKILL.md'))
     );
   });
 
@@ -182,13 +182,13 @@ describe('setup agent integration', () => {
       { target: 'codex', scope: 'home' },
     ]);
     assert.ok(
-      fs.existsSync(path.join(controlledHome, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(controlledHome, '.claude', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(
-      fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(
-      fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(!fs.existsSync(path.join(projectRoot, '.claude')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
@@ -216,13 +216,13 @@ describe('setup agent integration', () => {
       { target: 'codex', scope: 'home' },
     ]);
     assert.ok(
-      fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(
-      fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(
-      fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+      fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'consider', 'SKILL.md'))
     );
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.codex')));
@@ -234,9 +234,9 @@ describe('setup agent integration', () => {
       integrationTargets: ['claude', 'opencode', 'codex'],
     });
 
-    const claudeSkill = read('.claude/skills/feedback-loop/SKILL.md', projectRoot);
-    const openCodeSkill = read('.opencode/skills/feedback-loop/SKILL.md', projectRoot);
-    const codexSkill = read('.codex/skills/feedback-loop/SKILL.md', projectRoot);
+    const claudeSkill = read('.claude/skills/consider/SKILL.md', projectRoot);
+    const openCodeSkill = read('.opencode/skills/consider/SKILL.md', projectRoot);
+    const codexSkill = read('.codex/skills/consider/SKILL.md', projectRoot);
 
     assertHasSkillFrontmatter(claudeSkill);
     assertHasSkillFrontmatter(openCodeSkill);
@@ -269,7 +269,7 @@ describe('setup agent integration', () => {
         (entry) =>
           entry.target === 'claude' &&
           entry.scope === 'project' &&
-          entry.path.endsWith(path.join('.claude', 'skills', 'feedback-loop', 'SKILL.md'))
+          entry.path.endsWith(path.join('.claude', 'skills', 'consider', 'SKILL.md'))
       )
     );
     assert.ok(
@@ -277,7 +277,7 @@ describe('setup agent integration', () => {
         (entry) =>
           entry.target === 'codex' &&
           entry.scope === 'home' &&
-          entry.path.endsWith(path.join('.codex', 'skills', 'feedback-loop', 'SKILL.md'))
+          entry.path.endsWith(path.join('.codex', 'skills', 'consider', 'SKILL.md'))
       )
     );
   });
@@ -324,9 +324,9 @@ describe('setup agent integration', () => {
     const gitignore = read('.gitignore', projectRoot);
     assert.equal(countOccurrences(gitignore, '.feedback/'), 1);
 
-    const codexSkill = read('.codex/skills/feedback-loop/SKILL.md', projectRoot);
+    const codexSkill = read('.codex/skills/consider/SKILL.md', projectRoot);
     assertHasSkillFrontmatter(codexSkill);
-    assert.equal(countOccurrences(codexSkill, '\nname: feedback-loop\n'), 1);
+    assert.equal(countOccurrences(codexSkill, '\nname: consider\n'), 1);
   });
 
   it('uninstalls tracked skills, removes gitignore entry, and deletes .feedback by default', () => {
@@ -353,10 +353,10 @@ describe('setup agent integration', () => {
     assert.equal(result.gitignoreUpdated, true);
     assert.equal(result.skillsRemoved.length, 2);
     assert.ok(!fs.existsSync(path.join(projectRoot, '.feedback')));
-    assert.ok(!fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'feedback-loop')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'consider')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.claude')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.claude', 'skills')));
-    assert.ok(!fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'feedback-loop')));
+    assert.ok(!fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'consider')));
     assert.ok(fs.existsSync(path.join(controlledHome, '.opencode')));
     assert.ok(fs.existsSync(path.join(controlledHome, '.opencode', 'skills')));
     assert.equal(read('.gitignore', projectRoot).includes('.feedback/'), false);
@@ -376,7 +376,7 @@ describe('setup agent integration', () => {
     assert.equal(result.feedbackDirRemoved, false);
     assert.equal(result.gitignoreSkipped, true);
     assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'store.json')));
-    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'consider')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.codex')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.codex', 'skills')));
     const config = readJson('.feedback/config.json', projectRoot);
@@ -388,19 +388,19 @@ describe('setup agent integration', () => {
       projectRoot,
       '.codex',
       'skills',
-      'feedback-loop',
+      'consider',
       'SKILL.md'
     );
     writeFile(
       projectRoot,
-      path.join('.codex', 'skills', 'feedback-loop', 'SKILL.md'),
+      path.join('.codex', 'skills', 'consider', 'SKILL.md'),
       [
         '---',
-        'name: feedback-loop',
+        'name: consider',
         'description: feedback test',
         '---',
         '',
-        '# Feedback Loop',
+        '# Consider',
         '',
       ].join('\n')
     );
@@ -414,7 +414,7 @@ describe('setup agent integration', () => {
     assert.equal(result.fallbackDetectionUsed, true);
     assert.equal(result.skillsRemoved.length, 1);
     assert.equal(result.skillsRemoved[0], path.normalize(codexSkillPath));
-    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'feedback-loop')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'consider')));
   });
 
   it('detects existing integration footprints for guided setup defaults', () => {

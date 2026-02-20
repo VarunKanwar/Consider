@@ -1,6 +1,6 @@
-# AGENTS.md — Feedback Loop
+# AGENTS.md — Consider
 
-You are working on **Feedback Loop**, a VS Code extension and CLI tool for inline, bidirectional code feedback between developers and AI agents. Read `docs/spec.md` before doing anything. It is the canonical reference for all architectural decisions, data models, and constraints.
+You are working on **Consider**, a VS Code extension and CLI tool for inline, bidirectional code feedback between developers and AI agents. Read `docs/spec.md` before doing anything. It is the canonical reference for all architectural decisions, data models, and constraints.
 
 ## Project overview
 
@@ -44,7 +44,7 @@ If you think something should be added that isn't in the spec, ask before buildi
 After scaffolding, the repo should look roughly like:
 
 ```
-feedback-loop/
+consider/
 ├── docs/
 │   ├── spec.md                 # Technical specification (read-only reference)
 │   ├── progress.md             # Phase completion log (you update this)

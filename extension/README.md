@@ -1,6 +1,6 @@
-# Feedback Loop
+# Consider
 
-Feedback Loop is a VS Code extension for inline, bidirectional feedback between developers and AI coding agents.
+Consider is a VS Code extension for inline, bidirectional feedback between developers and AI coding agents.
 
 It gives you PR-style comment threads inside local files, while keeping feedback out of source code and out of git history.
 
@@ -47,6 +47,6 @@ It gives you PR-style comment threads inside local files, while keeping feedback
 
 ## Project Links
 
-- Repository: <https://github.com/VarunKanwar/feedback-loop>
-- Specification: <https://github.com/VarunKanwar/feedback-loop/blob/main/docs/spec.md>
-- Known limitations: <https://github.com/VarunKanwar/feedback-loop/blob/main/docs/known-limitations.md>
+- Repository: <https://github.com/VarunKanwar/consider>
+- Specification: <https://github.com/VarunKanwar/consider/blob/main/docs/spec.md>
+- Known limitations: <https://github.com/VarunKanwar/consider/blob/main/docs/known-limitations.md>

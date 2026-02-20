@@ -1,4 +1,4 @@
-# Manual Testing Guide — Feedback Loop Extension
+# Manual Testing Guide — Consider Extension
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@
 
 ## Test 1: Launch Extension in Development Mode
 
-1. Open the `feedback-loop` repo in VS Code.
+1. Open the `consider` repo in VS Code.
 2. Press **F5** (or Run > Start Debugging). Select "Run Extension" if prompted.
 3. A new VS Code window (Extension Development Host) should open.
 4. **Expected:** No errors in the Debug Console. The extension is active immediately on startup (no command needed first).
@@ -34,15 +34,15 @@
    - If no integrations are selected, no new skill files are written.
    - If integrations were selected, only selected targets are written/updated using each target's selected location:
      - Workspace install:
-       - Claude: `.claude/skills/feedback-loop/SKILL.md`
-       - OpenCode: `.opencode/skills/feedback-loop/SKILL.md`
-       - Codex: `.codex/skills/feedback-loop/SKILL.md`
+       - Claude: `.claude/skills/consider/SKILL.md`
+       - OpenCode: `.opencode/skills/consider/SKILL.md`
+       - Codex: `.codex/skills/consider/SKILL.md`
      - Home install:
-       - Claude: `~/.claude/skills/feedback-loop/SKILL.md`
-       - OpenCode: `~/.opencode/skills/feedback-loop/SKILL.md`
-       - Codex: `~/.codex/skills/feedback-loop/SKILL.md`
+       - Claude: `~/.claude/skills/consider/SKILL.md`
+       - OpenCode: `~/.opencode/skills/consider/SKILL.md`
+       - Codex: `~/.codex/skills/consider/SKILL.md`
    - Any written `SKILL.md` starts with YAML frontmatter containing:
-     - `name: feedback-loop`
+     - `name: consider`
      - `description: ...`
 
 ## Test 3: Add a Comment
@@ -174,7 +174,7 @@ This is the key test for the file watcher.
 2. **Expected:**
    - No duplicate `.feedback/` entries in `.gitignore`.
    - Existing skill files are refreshed in place (single file per target path for the selected install scope).
-   - Codex skill exists at `.codex/skills/feedback-loop/SKILL.md` (workspace scope) or `~/.codex/skills/feedback-loop/SKILL.md` (home scope).
+   - Codex skill exists at `.codex/skills/consider/SKILL.md` (workspace scope) or `~/.codex/skills/consider/SKILL.md` (home scope).
 
 ## Test 15: Uninstall / Offboarding
 
@@ -198,4 +198,4 @@ This is the key test for the file watcher.
 1. Open VS Code with no folder open (File > Close Folder).
 2. Launch the extension (F5).
 3. Try running any Feedback command from the Command Palette.
-4. **Expected:** A warning message says "Feedback Loop requires an open workspace folder."
+4. **Expected:** A warning message says "Consider requires an open workspace folder."

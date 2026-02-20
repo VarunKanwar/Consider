@@ -65,8 +65,8 @@ async function addCommentViaPayload(root, text, controllers) {
   await vscode.window.showTextDocument(doc);
 
   const controller = vscode.comments.createCommentController(
-    `feedback-loop-test-controller-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    'Feedback Loop Test'
+    `consider-test-controller-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    'Consider Test'
   );
   controllers.push(controller);
   const thread = controller.createCommentThread(
@@ -75,7 +75,7 @@ async function addCommentViaPayload(root, text, controllers) {
     []
   );
 
-  await vscode.commands.executeCommand('feedback-loop.addComment', {
+  await vscode.commands.executeCommand('consider.addComment', {
     text,
     thread,
   });
@@ -93,7 +93,7 @@ async function addCommentViaPayload(root, text, controllers) {
   };
 }
 
-suite('Feedback Loop Extension Host', () => {
+suite('Consider Extension Host', () => {
   /** @type {vscode.CommentController[]} */
   let controllers;
 
@@ -133,7 +133,7 @@ suite('Feedback Loop Extension Host', () => {
 
   test('setup command scaffolds feedback integration files', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
 
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'config.json')));
@@ -167,7 +167,7 @@ suite('Feedback Loop Extension Host', () => {
     const doc = await vscode.workspace.openTextDocument(sampleUri);
     await vscode.window.showTextDocument(doc);
 
-    const ranges = await vscode.commands.executeCommand('feedback-loop.debug.commentingRanges');
+    const ranges = await vscode.commands.executeCommand('consider.debug.commentingRanges');
     assert.ok(Array.isArray(ranges));
     assert.equal(ranges.length, doc.lineCount);
 
@@ -181,7 +181,7 @@ suite('Feedback Loop Extension Host', () => {
 
   test('add comment command writes a store record from command payload path', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
     const { commentId } = await addCommentViaPayload(
       root,
       'Integration test comment',
@@ -197,7 +197,7 @@ suite('Feedback Loop Extension Host', () => {
 
   test('renders external agent replies via store watcher updates', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
     const { thread, commentId, storePath } = await addCommentViaPayload(
       root,
       'Watcher integration test comment',
@@ -242,21 +242,21 @@ suite('Feedback Loop Extension Host', () => {
 
   test('resolve and reopen commands update store and thread state', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
     const { thread, commentId } = await addCommentViaPayload(
       root,
       'Resolve transition test comment',
       controllers
     );
 
-    await vscode.commands.executeCommand('feedback-loop.resolveThread', thread);
+    await vscode.commands.executeCommand('consider.resolveThread', thread);
     let store = readJson(path.join(root, '.feedback', 'store.json'));
     let comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after resolve command.');
     assert.equal(comment.workflowState, 'resolved');
     assert.equal(thread.state, vscode.CommentThreadState.Resolved);
 
-    await vscode.commands.executeCommand('feedback-loop.replyToComment', {
+    await vscode.commands.executeCommand('consider.replyToComment', {
       thread,
       text: 'should be blocked while resolved',
     });
@@ -265,7 +265,7 @@ suite('Feedback Loop Extension Host', () => {
     assert.ok(comment, 'Expected comment after blocked reply.');
     assert.equal(comment.thread.length, 0);
 
-    await vscode.commands.executeCommand('feedback-loop.unresolveThread', thread);
+    await vscode.commands.executeCommand('consider.unresolveThread', thread);
     store = readJson(path.join(root, '.feedback', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after reopen command.');
@@ -275,7 +275,7 @@ suite('Feedback Loop Extension Host', () => {
 
   test('tree comment selection opens and expands only the selected thread', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
 
     const first = await addCommentViaPayload(
       root,
@@ -298,7 +298,7 @@ suite('Feedback Loop Extension Host', () => {
     );
 
     await vscode.commands.executeCommand(
-      'feedback-loop.openCommentFromTree',
+      'consider.openCommentFromTree',
       first.commentId
     );
     await waitFor(
@@ -312,7 +312,7 @@ suite('Feedback Loop Extension Host', () => {
     );
 
     await vscode.commands.executeCommand(
-      'feedback-loop.openCommentFromTree',
+      'consider.openCommentFromTree',
       first.commentId
     );
     await waitFor(
@@ -324,7 +324,7 @@ suite('Feedback Loop Extension Host', () => {
 
   test('tree inline toggle command collapses and expands a single thread', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
 
     const first = await addCommentViaPayload(
       root,
@@ -337,7 +337,7 @@ suite('Feedback Loop Extension Host', () => {
       controllers
     );
 
-    await vscode.commands.executeCommand('feedback-loop.openCommentFromTree', first.commentId);
+    await vscode.commands.executeCommand('consider.openCommentFromTree', first.commentId);
     await waitFor(
       () =>
         first.thread.collapsibleState === vscode.CommentThreadCollapsibleState.Expanded,
@@ -348,7 +348,7 @@ suite('Feedback Loop Extension Host', () => {
       vscode.CommentThreadCollapsibleState.Collapsed
     );
 
-    await vscode.commands.executeCommand('feedback-loop.toggleCommentThreadFromTree', {
+    await vscode.commands.executeCommand('consider.toggleCommentThreadFromTree', {
       kind: 'comment',
       comment: { id: first.commentId },
     });
@@ -362,7 +362,7 @@ suite('Feedback Loop Extension Host', () => {
       vscode.CommentThreadCollapsibleState.Collapsed
     );
 
-    await vscode.commands.executeCommand('feedback-loop.toggleCommentThreadFromTree', {
+    await vscode.commands.executeCommand('consider.toggleCommentThreadFromTree', {
       kind: 'comment',
       comment: { id: first.commentId },
     });
@@ -389,7 +389,7 @@ suite('Feedback Loop Extension Host', () => {
       homeDir: fakeHome,
     });
 
-    const codexSkill = path.join(root, '.codex', 'skills', 'feedback-loop', 'SKILL.md');
+    const codexSkill = path.join(root, '.codex', 'skills', 'consider', 'SKILL.md');
     assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
     assert.ok(fs.existsSync(codexSkill));
 
@@ -408,17 +408,17 @@ suite('Feedback Loop Extension Host', () => {
       integrationInstalls: [{ target: 'claude', scope: 'project' }],
       homeDir: fakeHome,
     });
-    const claudeSkill = path.join(root, '.claude', 'skills', 'feedback-loop', 'SKILL.md');
+    const claudeSkill = path.join(root, '.claude', 'skills', 'consider', 'SKILL.md');
     assert.ok(fs.existsSync(claudeSkill));
 
-    await vscode.commands.executeCommand('feedback-loop.uninstallAgentIntegration');
+    await vscode.commands.executeCommand('consider.uninstallAgentIntegration');
     assert.ok(!fs.existsSync(path.join(root, '.feedback')));
     assert.ok(!fs.existsSync(claudeSkill));
   });
 
   test('updates stale and orphaned status after file edits and deletion', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
     const { thread, commentId } = await addCommentViaPayload(
       root,
       'Stale-orphan integration test comment',
@@ -432,7 +432,7 @@ suite('Feedback Loop Extension Host', () => {
       'utf-8'
     );
 
-    await vscode.commands.executeCommand('feedback-loop.reconcileAll');
+    await vscode.commands.executeCommand('consider.reconcileAll');
     let store = readJson(path.join(root, '.feedback', 'store.json'));
     let comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after stale transition.');
@@ -446,7 +446,7 @@ suite('Feedback Loop Extension Host', () => {
     );
 
     fs.unlinkSync(samplePath);
-    await vscode.commands.executeCommand('feedback-loop.reconcileAll');
+    await vscode.commands.executeCommand('consider.reconcileAll');
     store = readJson(path.join(root, '.feedback', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after orphan transition.');
@@ -462,7 +462,7 @@ suite('Feedback Loop Extension Host', () => {
 
   test('archive resolved command moves resolved comments into archive', async () => {
     const root = workspaceRoot();
-    await vscode.commands.executeCommand('feedback-loop.setupAgentIntegration');
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
 
     const storePath = path.join(root, '.feedback', 'store.json');
     const store = readJson(storePath);
@@ -492,7 +492,7 @@ suite('Feedback Loop Extension Host', () => {
     ];
     fs.writeFileSync(storePath, JSON.stringify(store, null, 2) + '\n', 'utf-8');
 
-    await vscode.commands.executeCommand('feedback-loop.archiveResolved');
+    await vscode.commands.executeCommand('consider.archiveResolved');
 
     const nextStore = readJson(storePath);
     assert.equal(nextStore.comments.length, 1);

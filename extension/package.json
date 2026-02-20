@@ -1,17 +1,17 @@
 {
-  "name": "feedback-loop",
-  "displayName": "Feedback Loop",
+  "name": "consider",
+  "displayName": "Consider",
   "description": "Inline bidirectional feedback between developers and AI agents",
   "version": "0.1.0",
-  "publisher": "feedback-loop",
+  "publisher": "consider",
   "license": "UNLICENSED",
-  "homepage": "https://github.com/VarunKanwar/feedback-loop#readme",
+  "homepage": "https://github.com/VarunKanwar/consider#readme",
   "bugs": {
-    "url": "https://github.com/VarunKanwar/feedback-loop/issues"
+    "url": "https://github.com/VarunKanwar/consider/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/VarunKanwar/feedback-loop.git"
+    "url": "https://github.com/VarunKanwar/consider.git"
   },
   "engines": {
     "vscode": "^1.82.0"
@@ -22,58 +22,58 @@
   "activationEvents": [
     "onStartupFinished",
     "workspaceContains:.feedback/store.json",
-    "onCommand:feedback-loop.addComment",
-    "onCommand:feedback-loop.setupAgentIntegration",
-    "onCommand:feedback-loop.uninstallAgentIntegration"
+    "onCommand:consider.addComment",
+    "onCommand:consider.setupAgentIntegration",
+    "onCommand:consider.uninstallAgentIntegration"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "feedback-loop.addComment",
+        "command": "consider.addComment",
         "title": "Add Comment"
       },
       {
-        "command": "feedback-loop.replyToComment",
+        "command": "consider.replyToComment",
         "title": "Reply"
       },
       {
-        "command": "feedback-loop.resolveThread",
+        "command": "consider.resolveThread",
         "title": "Resolve",
         "icon": "$(pass)"
       },
       {
-        "command": "feedback-loop.unresolveThread",
+        "command": "consider.unresolveThread",
         "title": "Unresolve",
         "icon": "$(refresh)"
       },
       {
-        "command": "feedback-loop.deleteComment",
+        "command": "consider.deleteComment",
         "title": "Delete",
         "icon": "$(trash)"
       },
       {
-        "command": "feedback-loop.setupAgentIntegration",
+        "command": "consider.setupAgentIntegration",
         "title": "Feedback: Setup Agent Integration"
       },
       {
-        "command": "feedback-loop.uninstallAgentIntegration",
+        "command": "consider.uninstallAgentIntegration",
         "title": "Feedback: Uninstall"
       },
       {
-        "command": "feedback-loop.showAllComments",
+        "command": "consider.showAllComments",
         "title": "Feedback: Show All Comments"
       },
       {
-        "command": "feedback-loop.archiveResolved",
+        "command": "consider.archiveResolved",
         "title": "Feedback: Archive Resolved"
       },
       {
-        "command": "feedback-loop.reconcileAll",
+        "command": "consider.reconcileAll",
         "title": "Feedback: Reconcile All"
       },
       {
-        "command": "feedback-loop.toggleCommentThreadFromTree",
+        "command": "consider.toggleCommentThreadFromTree",
         "title": "Toggle Thread",
         "icon": "$(collapse-all)"
       }
@@ -81,7 +81,7 @@
     "views": {
       "explorer": [
         {
-          "id": "feedback-loop.comments",
+          "id": "consider.comments",
           "name": "Feedback Comments"
         }
       ]
@@ -89,50 +89,50 @@
     "menus": {
       "comments/commentThread/title": [
         {
-          "command": "feedback-loop.resolveThread",
+          "command": "consider.resolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-open-/"
+          "when": "commentController == consider && commentThread =~ /^feedback-thread-open-/"
         },
         {
-          "command": "feedback-loop.unresolveThread",
+          "command": "consider.unresolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-resolved-/"
+          "when": "commentController == consider && commentThread =~ /^feedback-thread-resolved-/"
         }
       ],
       "comments/commentThread/context": [
         {
-          "command": "feedback-loop.addComment",
+          "command": "consider.addComment",
           "group": "inline",
-          "when": "commentController == feedback-loop && commentThreadIsEmpty"
+          "when": "commentController == consider && commentThreadIsEmpty"
         },
         {
-          "command": "feedback-loop.replyToComment",
+          "command": "consider.replyToComment",
           "group": "inline",
-          "when": "commentController == feedback-loop && !commentThreadIsEmpty && commentThread =~ /^feedback-thread-open-/"
+          "when": "commentController == consider && !commentThreadIsEmpty && commentThread =~ /^feedback-thread-open-/"
         },
         {
-          "command": "feedback-loop.resolveThread",
+          "command": "consider.resolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-open-/"
+          "when": "commentController == consider && commentThread =~ /^feedback-thread-open-/"
         },
         {
-          "command": "feedback-loop.unresolveThread",
+          "command": "consider.unresolveThread",
           "group": "navigation",
-          "when": "commentController == feedback-loop && commentThread =~ /^feedback-thread-resolved-/"
+          "when": "commentController == consider && commentThread =~ /^feedback-thread-resolved-/"
         }
       ],
       "comments/comment/title": [
         {
-          "command": "feedback-loop.deleteComment",
+          "command": "consider.deleteComment",
           "group": "inline",
-          "when": "commentController == feedback-loop"
+          "when": "commentController == consider"
         }
       ],
       "view/item/context": [
         {
-          "command": "feedback-loop.toggleCommentThreadFromTree",
+          "command": "consider.toggleCommentThreadFromTree",
           "group": "inline",
-          "when": "view == feedback-loop.comments && viewItem =~ /feedback-comment-/"
+          "when": "view == consider.comments && viewItem =~ /feedback-comment-/"
         }
       ]
     }

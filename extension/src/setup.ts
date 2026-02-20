@@ -3,20 +3,20 @@ import * as os from 'os';
 import * as path from 'path';
 import { emptyStore, storePath, writeStore } from './store';
 
-const CLAUDE_SKILL_PATH = ['.claude', 'skills', 'feedback-loop', 'SKILL.md'];
-const OPENCODE_SKILL_PATH = ['.opencode', 'skills', 'feedback-loop', 'SKILL.md'];
-const CODEX_SKILL_PATH = ['.codex', 'skills', 'feedback-loop', 'SKILL.md'];
-const CODEX_LEGACY_SKILL_PATH = ['.agents', 'skills', 'feedback-loop', 'SKILL.md'];
-const SKILL_NAME = 'feedback-loop';
+const CLAUDE_SKILL_PATH = ['.claude', 'skills', 'consider', 'SKILL.md'];
+const OPENCODE_SKILL_PATH = ['.opencode', 'skills', 'consider', 'SKILL.md'];
+const CODEX_SKILL_PATH = ['.codex', 'skills', 'consider', 'SKILL.md'];
+const CODEX_LEGACY_SKILL_PATH = ['.agents', 'skills', 'consider', 'SKILL.md'];
+const SKILL_NAME = 'consider';
 const SETUP_CONFIG_VERSION = 1;
 
 const SKILL_DESCRIPTIONS: Record<SetupIntegrationTarget, string> = {
   claude:
-    'Use when this repository has Feedback Loop enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
   opencode:
-    'Use when this repository has Feedback Loop enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
   codex:
-    'Use when this repository has Feedback Loop enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
 };
 
 export interface AgentDetection {
@@ -365,7 +365,7 @@ function looksLikeFeedbackLoopSkill(skillPath: string): boolean {
   }
   try {
     const raw = fs.readFileSync(skillPath, 'utf-8');
-    return raw.includes('\nname: feedback-loop\n') && raw.includes('# Feedback Loop');
+    return raw.includes('\nname: consider\n') && raw.includes('# Consider');
   } catch {
     return false;
   }
@@ -394,9 +394,9 @@ function buildSkillMarkdown(target: SetupIntegrationTarget): string {
   ].join('\n');
 
   return `${frontmatter}
-# Feedback Loop
+# Consider
 
-You are configured with Feedback Loop inline review comments for this repository.
+You are configured with Consider inline review comments for this repository.
 Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedback.
 
 ## Workflow

@@ -203,7 +203,7 @@ class FeedbackCommentsTreeProvider
           ? new vscode.ThemeIcon('pass')
           : new vscode.ThemeIcon('comment');
     item.command = {
-      command: 'feedback-loop.openCommentFromTree',
+      command: 'consider.openCommentFromTree',
       title: 'Open Feedback Comment',
       arguments: [comment.id],
     };
@@ -280,14 +280,14 @@ class FeedbackLoopController {
   constructor(private context: vscode.ExtensionContext) {
     this.projectRoot = this.getProjectRoot();
     this.commentsTreeProvider = new FeedbackCommentsTreeProvider(this.projectRoot);
-    this.commentsTreeView = vscode.window.createTreeView('feedback-loop.comments', {
+    this.commentsTreeView = vscode.window.createTreeView('consider.comments', {
       treeDataProvider: this.commentsTreeProvider,
       showCollapseAll: true,
     });
 
     this.commentController = vscode.comments.createCommentController(
-      'feedback-loop',
-      'Feedback Loop Annotations'
+      'consider',
+      'Consider Annotations'
     );
     this.commentController.commentingRangeProvider = {
       provideCommentingRanges: (
@@ -336,7 +336,7 @@ class FeedbackLoopController {
     // Handle new comment creation (user types in the empty comment thread)
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.addComment',
+        'consider.addComment',
         (arg?: unknown) => {
           if (this.isCommentReply(arg)) {
             this.handleNewComment(arg);
@@ -350,7 +350,7 @@ class FeedbackLoopController {
     // Handle reply to existing thread
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.replyToComment',
+        'consider.replyToComment',
         (reply: vscode.CommentReply) => {
           this.handleReply(reply);
         }
@@ -360,7 +360,7 @@ class FeedbackLoopController {
     // Resolve thread
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.resolveThread',
+        'consider.resolveThread',
         (thread: vscode.CommentThread) => {
           this.handleResolve(thread);
         }
@@ -370,7 +370,7 @@ class FeedbackLoopController {
     // Unresolve (reopen) thread
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.unresolveThread',
+        'consider.unresolveThread',
         (thread: vscode.CommentThread) => {
           this.handleUnresolve(thread);
         }
@@ -380,7 +380,7 @@ class FeedbackLoopController {
     // Delete comment
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.deleteComment',
+        'consider.deleteComment',
         (comment: FeedbackReply) => {
           this.handleDeleteComment(comment);
         }
@@ -390,7 +390,7 @@ class FeedbackLoopController {
     // Setup Agent Integration
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.setupAgentIntegration',
+        'consider.setupAgentIntegration',
         () => {
           void this.handleSetupAgentIntegration();
         }
@@ -399,7 +399,7 @@ class FeedbackLoopController {
 
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.uninstallAgentIntegration',
+        'consider.uninstallAgentIntegration',
         () => {
           void this.handleUninstallAgentIntegration();
         }
@@ -408,21 +408,21 @@ class FeedbackLoopController {
 
     // Show All Comments (tree view + status filter)
     this.disposables.push(
-      vscode.commands.registerCommand('feedback-loop.showAllComments', () => {
+      vscode.commands.registerCommand('consider.showAllComments', () => {
         void this.handleShowAllComments();
       })
     );
 
     // Archive Resolved
     this.disposables.push(
-      vscode.commands.registerCommand('feedback-loop.archiveResolved', () => {
+      vscode.commands.registerCommand('consider.archiveResolved', () => {
         this.handleArchiveResolved();
       })
     );
 
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.openCommentFromTree',
+        'consider.openCommentFromTree',
         (commentId: string) => {
           void this.handleOpenCommentFromTree(commentId);
         }
@@ -430,7 +430,7 @@ class FeedbackLoopController {
     );
     this.disposables.push(
       vscode.commands.registerCommand(
-        'feedback-loop.toggleCommentThreadFromTree',
+        'consider.toggleCommentThreadFromTree',
         (arg?: unknown) => {
           this.handleToggleCommentThreadFromTree(arg);
         }
@@ -439,14 +439,14 @@ class FeedbackLoopController {
 
     // Reconcile All
     this.disposables.push(
-      vscode.commands.registerCommand('feedback-loop.reconcileAll', () => {
+      vscode.commands.registerCommand('consider.reconcileAll', () => {
         this.handleReconcileAll();
       })
     );
 
     if (this.context.extensionMode === vscode.ExtensionMode.Test) {
       this.disposables.push(
-        vscode.commands.registerCommand('feedback-loop.debug.commentingRanges', () => {
+        vscode.commands.registerCommand('consider.debug.commentingRanges', () => {
           const active = vscode.window.activeTextEditor;
           if (!active) {
             return [];
@@ -697,7 +697,7 @@ class FeedbackLoopController {
   }
 
   private async maybePromptForSetup(): Promise<void> {
-    const promptStateKey = 'feedback-loop.setupPromptShown';
+    const promptStateKey = 'consider.setupPromptShown';
     const storeExists = fs.existsSync(path.join(this.projectRoot, '.feedback', 'store.json'));
     if (storeExists) {
       return;
@@ -709,7 +709,7 @@ class FeedbackLoopController {
     await this.context.workspaceState.update(promptStateKey, true);
 
     const selected = await vscode.window.showInformationMessage(
-      'Feedback Loop is installed for this workspace. Run setup to initialize .feedback and optional agent integrations.',
+      'Consider is installed for this workspace. Run setup to initialize .feedback and optional agent integrations.',
       'Set Up Now',
       'Later'
     );
@@ -735,15 +735,15 @@ class FeedbackLoopController {
     scope: 'project' | 'home'
   ): string {
     const projectPath = target === 'claude'
-      ? '.claude/skills/feedback-loop/SKILL.md'
+      ? '.claude/skills/consider/SKILL.md'
       : target === 'opencode'
-        ? '.opencode/skills/feedback-loop/SKILL.md'
-        : '.codex/skills/feedback-loop/SKILL.md';
+        ? '.opencode/skills/consider/SKILL.md'
+        : '.codex/skills/consider/SKILL.md';
     const homePath = target === 'claude'
-      ? '~/.claude/skills/feedback-loop/SKILL.md'
+      ? '~/.claude/skills/consider/SKILL.md'
       : target === 'opencode'
-        ? '~/.opencode/skills/feedback-loop/SKILL.md'
-        : '~/.codex/skills/feedback-loop/SKILL.md';
+        ? '~/.opencode/skills/consider/SKILL.md'
+        : '~/.codex/skills/consider/SKILL.md';
     return scope === 'home' ? homePath : projectPath;
   }
 
@@ -780,7 +780,7 @@ class FeedbackLoopController {
     content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';"
   />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Feedback Loop Agent Skills</title>
+  <title>Consider Agent Skills</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -1132,7 +1132,7 @@ class FeedbackLoopController {
       }
 
       vscode.window.showInformationMessage(
-        `Feedback Loop setup complete: ${summary.join(', ')}.`
+        `Consider setup complete: ${summary.join(', ')}.`
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1173,7 +1173,7 @@ class FeedbackLoopController {
 
     const confirm = await vscode.window.showWarningMessage(
       selected.removeFeedbackDir
-        ? 'This will remove Feedback Loop data and uninstall tracked skills. Continue?'
+        ? 'This will remove Consider data and uninstall tracked skills. Continue?'
         : 'This will uninstall tracked skills and keep .feedback data. Continue?',
       { modal: true },
       'Uninstall'
@@ -1209,7 +1209,7 @@ class FeedbackLoopController {
       this.reloadFromStore();
 
       if (result.feedbackDirRemoved) {
-        await this.context.workspaceState.update('feedback-loop.setupPromptShown', false);
+        await this.context.workspaceState.update('consider.setupPromptShown', false);
       }
 
       const summary: string[] = [];
@@ -1242,7 +1242,7 @@ class FeedbackLoopController {
       }
 
       vscode.window.showInformationMessage(
-        `Feedback Loop uninstall complete: ${summary.join(', ')}.`
+        `Consider uninstall complete: ${summary.join(', ')}.`
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -1290,7 +1290,7 @@ class FeedbackLoopController {
     this.reloadFromStore();
 
     try {
-      await vscode.commands.executeCommand('feedback-loop.comments.focus');
+      await vscode.commands.executeCommand('consider.comments.focus');
     } catch {
       await vscode.commands.executeCommand('workbench.view.explorer');
     }
@@ -1899,13 +1899,13 @@ class FeedbackLoopController {
 let controller: FeedbackLoopController | undefined;
 
 const WORKSPACE_REQUIRED_COMMANDS = [
-  'feedback-loop.addComment',
-  'feedback-loop.setupAgentIntegration',
-  'feedback-loop.uninstallAgentIntegration',
-  'feedback-loop.showAllComments',
-  'feedback-loop.archiveResolved',
-  'feedback-loop.reconcileAll',
-  'feedback-loop.toggleCommentThreadFromTree',
+  'consider.addComment',
+  'consider.setupAgentIntegration',
+  'consider.uninstallAgentIntegration',
+  'consider.showAllComments',
+  'consider.archiveResolved',
+  'consider.reconcileAll',
+  'consider.toggleCommentThreadFromTree',
 ] as const;
 
 function hasWorkspaceFolder(): boolean {
@@ -1916,7 +1916,7 @@ function hasWorkspaceFolder(): boolean {
 function registerWorkspaceWarningCommands(
   tryInitializeForWorkspace: () => boolean
 ): vscode.Disposable[] {
-  const warning = 'Feedback Loop requires an open workspace folder.';
+  const warning = 'Consider requires an open workspace folder.';
   return WORKSPACE_REQUIRED_COMMANDS.map((cmd) =>
     vscode.commands.registerCommand(cmd, async (...args: unknown[]) => {
       // The workspace can arrive after activation starts on slower machines.
@@ -1966,7 +1966,7 @@ export function activate(context: vscode.ExtensionContext): void {
       if (message === 'No workspace folder open.') {
         return false;
       }
-      void vscode.window.showErrorMessage(`Feedback Loop failed to activate: ${message}`);
+      void vscode.window.showErrorMessage(`Consider failed to activate: ${message}`);
       return false;
     }
   };

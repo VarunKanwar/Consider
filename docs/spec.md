@@ -1,8 +1,8 @@
-# Feedback Loop: Technical Specification
+# Consider: Technical Specification
 
 ## Document Purpose
 
-This document is the canonical reference for building Feedback Loop, a VS Code extension and accompanying CLI tool that enables inline, bidirectional feedback between a human developer and an AI coding agent. It is written to give a fresh team complete context: the problem, the decisions already made, the open questions, and the constraints.
+This document is the canonical reference for building Consider, a VS Code extension and accompanying CLI tool that enables inline, bidirectional feedback between a human developer and an AI coding agent. It is written to give a fresh team complete context: the problem, the decisions already made, the open questions, and the constraints.
 
 Read the whole thing before writing any code.
 
@@ -41,7 +41,7 @@ These are non-negotiable requirements that were established during design discus
 
 **C3: Feedback is not code.** The developer should not have to write comments in source-code syntax, insert sentinel values, or otherwise modify files to communicate with the agent. The annotation layer is entirely separate from the files it annotates.
 
-**C4: Preserve the main conversation.** The developer already has a conversation with the agent in a terminal, sidebar, or other interface. Feedback Loop should not replace that conversation — it should complement it. Inline comment threads are a *separate channel* for located, specific feedback. The main conversation remains the primary interaction surface.
+**C4: Preserve the main conversation.** The developer already has a conversation with the agent in a terminal, sidebar, or other interface. Consider should not replace that conversation — it should complement it. Inline comment threads are a *separate channel* for located, specific feedback. The main conversation remains the primary interaction surface.
 
 **C5: Zero-setup agent integration.** The CLI tool that agents use to read/write feedback must work without requiring the developer to install additional runtimes, run package managers, or configure anything beyond what the extension's setup command provides. It must run in the environment that any developer using VS Code + an AI agent already has.
 
@@ -237,7 +237,7 @@ In addition to `store.json`, setup/uninstall state is tracked in `.feedback/conf
     {
       "target": "claude",
       "scope": "project",
-      "path": "/absolute/path/to/.claude/skills/feedback-loop/SKILL.md"
+      "path": "/absolute/path/to/.claude/skills/consider/SKILL.md"
     }
   ],
   "lastUpdatedAt": "2026-02-17T12:34:56.000Z"
@@ -429,21 +429,21 @@ Comment threads are *not* part of the main conversation history. They exist in t
 The "Setup Agent Integration" command can write skill files into the project when the developer explicitly opts in. Each skill file explains the feedback system to the agent: what the CLI commands are, what the conventions are, and how to use them.
 
 **For Claude Code:**
-- Project-local: `.claude/skills/feedback-loop/SKILL.md`
-- Home-level: `~/.claude/skills/feedback-loop/SKILL.md`
+- Project-local: `.claude/skills/consider/SKILL.md`
+- Home-level: `~/.claude/skills/consider/SKILL.md`
 
 **For OpenCode:**
-- Project-local: `.opencode/skills/feedback-loop/SKILL.md`
-- Home-level: `~/.opencode/skills/feedback-loop/SKILL.md`
+- Project-local: `.opencode/skills/consider/SKILL.md`
+- Home-level: `~/.opencode/skills/consider/SKILL.md`
   (OpenCode also reads `.claude/skills/` as a fallback, so the Claude Code file might suffice, but having a dedicated one is cleaner.)
 
 **For Codex:**
-- Project-local: `.codex/skills/feedback-loop/SKILL.md`
-- Home-level: `~/.codex/skills/feedback-loop/SKILL.md`
+- Project-local: `.codex/skills/consider/SKILL.md`
+- Home-level: `~/.codex/skills/consider/SKILL.md`
 
 **Skill file content should include:**
 - Required YAML frontmatter for the target agent:
-  - `name` (use `feedback-loop`, lowercase with hyphens),
+  - `name` (use `consider`, lowercase with hyphens),
   - `description` (when and why the skill should be used).
 - What the feedback system is and why it exists.
 - The full CLI command reference with examples.
@@ -478,9 +478,9 @@ When the developer runs "Feedback: Uninstall":
    - skills-only uninstall (keep `.feedback/` data).
 2. Read tracked skill installs from `.feedback/config.json`.
 3. Remove tracked skill files/folders for the selected uninstall mode.
-   - Limit deletion scope to the Feedback Loop skill package directory (`.../skills/feedback-loop`) rather than deleting agent root directories.
+   - Limit deletion scope to the Consider skill package directory (`.../skills/consider`) rather than deleting agent root directories.
    - If skills-only uninstall is selected, clear removed skill entries from `.feedback/config.json`.
-4. If no tracking data exists (older installs), fall back to discovering Feedback Loop skill files in known locations and remove those.
+4. If no tracking data exists (older installs), fall back to discovering Consider skill files in known locations and remove those.
 5. Remove `.feedback/` when full uninstall is selected.
 6. Print a summary of removed/skipped artifacts.
 
@@ -602,7 +602,7 @@ The recommended build order, with each step producing a usable increment:
 
 **Phase 7: Onboarding and installation UX** — Replace implicit setup side effects with a guided setup flow in the extension. Keep `.feedback/` at project root for v1, make agent integration writes explicit opt-in, and improve first-run discoverability/documentation for end users.
 
-**Phase 8: Offboarding and uninstall UX** — Add a dedicated uninstall flow that can remove Feedback Loop runtime files and installed skills safely. Track install locations at setup time and use that tracking for deterministic cleanup.
+**Phase 8: Offboarding and uninstall UX** — Add a dedicated uninstall flow that can remove Consider runtime files and installed skills safely. Track install locations at setup time and use that tracking for deterministic cleanup.
 
 **Phase 9: Thread state model split** — Separate workflow lifecycle from anchor reliability by splitting state into `workflowState` (`open|resolved`) and `anchorState` (`anchored|stale|orphaned`). Ensure CLI and extension render and filter both dimensions consistently.
 
