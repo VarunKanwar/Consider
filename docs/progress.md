@@ -7,13 +7,13 @@
 ### What was built
 
 1. **Shared store module** (`shared/store.js`)
-   - `readStore(projectRoot)` — reads `.feedback/store.json`, returns empty store if absent.
+   - `readStore(projectRoot)` — reads `.consider/store.json`, returns empty store if absent.
    - `writeStore(projectRoot, store)` — atomic write via temp file + rename.
-   - `findProjectRoot(startDir)` — walks up directory tree looking for `.feedback/`.
+   - `findProjectRoot(startDir)` — walks up directory tree looking for `.consider/`.
    - `generateCommentId()` / `generateReplyId()` — `c_` / `r_` prefix + 8 random hex chars.
    - `findComment(store, id)` — lookup by comment ID.
 
-2. **CLI tool** (`cli/feedback-cli.js` + `cli/feedback-cli` shell wrapper)
+2. **CLI tool** (`cli/consider-cli.js` + `cli/consider-cli` shell wrapper)
    - `list [--status <s>] [--file <path>] [--json]` — lists comments filtered by status (default: open) and file path prefix.
    - `get <id> [--json]` — shows a comment with its full thread.
    - `reply <id> --message "..."` — adds a reply as `author: "agent"`.
@@ -69,7 +69,7 @@
    - **Reply** — adds a reply to an existing thread, persists to store.
    - **Resolve/Unresolve** — toggles comment status between `open` and `resolved`, updates both the store and the visual thread state.
    - **Delete** — removes a root comment (entire thread) or a single reply.
-   - **File watcher** — watches `.feedback/store.json` for changes. When the agent writes a reply via CLI, the store changes, and the extension re-renders affected threads. Agent replies appear inline with "Agent" author label.
+   - **File watcher** — watches `.consider/store.json` for changes. When the agent writes a reply via CLI, the store changes, and the extension re-renders affected threads. Agent replies appear inline with "Agent" author label.
    - **Startup load** — reads all comments from the store on activation and creates visual threads.
    - **Watcher suppression** — the extension suppresses its own file watcher during writes to avoid re-reading its own changes.
    - **Graceful no-workspace handling** — if no workspace folder is open, commands show a warning message.
@@ -83,7 +83,7 @@
 - **Author display:** "Developer" for human author, "Agent" for agent author. No icon paths (the VS Code CommentAuthorInformation `iconPath` field requires a `Uri`, not a `ThemeIcon`, so we omit it for simplicity — author names are sufficient for distinguishing).
 - **Context capture on comment creation:** 2 lines of context before/after are captured at comment creation time. This will feed into the Phase 3 re-anchoring algorithm.
 - **Watcher suppression timeout:** 500ms timeout after writing to store before re-enabling the file watcher. This prevents spurious re-reads from our own writes while still catching agent writes that arrive shortly after.
-- **Comment thread `contextValue`:** Used to control menu visibility. Open threads show "Resolve", resolved threads show "Reopen". Format: `feedback-thread-<status>`.
+- **Comment thread `contextValue`:** Used to control menu visibility. Open threads show "Resolve", resolved threads show "Reopen". Format: `consider-thread-<status>`.
 - **Store adapter is a separate TypeScript file,** not a direct import of `shared/store.js`. This keeps the extension's TypeScript strict mode working and avoids require-path issues at runtime. Both implementations follow the same schema and must stay in sync.
 
 ### What was tested
@@ -95,7 +95,7 @@
 ### What's known to be incomplete
 
 - **No reconciliation** — Phase 3. Comments use static line numbers.
-- **No agent setup command** — Phase 4. Current stub only creates `.feedback/` directory.
+- **No agent setup command** — Phase 4. Current stub only creates `.consider/` directory.
 - **No tree view panel** — Phase 5.
 - **No archive resolved** — Phase 5.
 - **Extension unit tests** — the VS Code Comments API cannot be unit-tested outside the extension host. Pure store logic is tested via the CLI tests. Extension behavior is covered by the manual testing guide.
@@ -120,7 +120,7 @@
    - Added mtime-gated checks via `anchor.lastAnchorCheck` so unchanged files are skipped.
    - Added anchor snapshot refresh on successful re-anchor (`startLine`, `endLine`, contexts, `targetContent`, `contentHash`, `lastAnchorCheck`).
 
-2. **CLI lazy reconciliation on reads** (`cli/feedback-cli.js`)
+2. **CLI lazy reconciliation on reads** (`cli/consider-cli.js`)
    - Read commands now reconcile before returning output:
      - `list`
      - `get`
@@ -131,7 +131,7 @@
 
 3. **Extension reconciliation wiring** (`extension/src/extension.ts`, `extension/src/reconcile.ts`)
    - Added extension wrapper module over shared reconciliation to keep behavior aligned with CLI.
-   - Implemented `Feedback: Reconcile All` command using `force` reconciliation.
+   - Implemented `Consider: Reconcile All` command using `force` reconciliation.
    - Implemented automatic file-scoped reconciliation triggers:
      - on file open,
      - on save,
@@ -182,13 +182,13 @@
 
 1. **Setup module for agent integration** (`extension/src/setup.ts`)
    - Added `runSetupAgentIntegration(projectRoot, { cliSourceDir })` as the Phase 4 implementation core.
-   - Creates `.feedback/` and `.feedback/bin/` if missing.
-   - Creates `.feedback/store.json` if missing (using existing atomic store write path).
+   - Creates `.consider/` and `.consider/bin/` if missing.
+   - Creates `.consider/store.json` if missing (using existing atomic store write path).
    - Copies CLI artifacts into project-local deploy target:
-     - `.feedback/bin/feedback-cli`
-     - `.feedback/bin/feedback-cli.js`
+     - `.consider/bin/consider-cli`
+     - `.consider/bin/consider-cli.js`
    - Ensures shell wrapper remains executable (`chmod 755`).
-   - Updates `.gitignore` with `.feedback/` exactly once (no duplicates).
+   - Updates `.gitignore` with `.consider/` exactly once (no duplicates).
    - Detects agent footprints and installs integrations per spec behavior:
      - Claude Code skill: `.claude/skills/consider/SKILL.md`
      - OpenCode skill: `.opencode/skills/consider/SKILL.md`
@@ -212,7 +212,7 @@
 
 5. **Manual testing guide updates** (`docs/manual-testing.md`)
    - Updated setup expectations to reflect full Phase 4 behavior.
-   - Switched CLI invocation examples to deployed wrapper (`.feedback/bin/feedback-cli`).
+   - Switched CLI invocation examples to deployed wrapper (`.consider/bin/consider-cli`).
    - Added explicit idempotency manual test.
 
 ### What was tested
@@ -248,17 +248,17 @@
 ### What was built
 
 1. **Comments tree view panel** (`extension/package.json`, `extension/src/extension.ts`, `extension/src/tree-data.ts`)
-   - Added Explorer view contribution: `Feedback Comments`.
+   - Added Explorer view contribution: `Consider Comments`.
    - Implemented grouped-by-file tree data with status filtering (`all/open/resolved/stale/orphaned`).
-   - Implemented `Feedback: Show All Comments` command flow:
+   - Implemented `Consider: Show All Comments` command flow:
      - prompts for status filter,
      - updates tree provider filter,
      - focuses the comments view.
    - Tree comment items open and reveal their anchored location in editor.
 
 2. **Archive resolved workflow** (`extension/src/archive.ts`, `extension/src/extension.ts`)
-   - Implemented `Feedback: Archive Resolved`.
-   - Resolved comments are moved from active `.feedback/store.json` into `.feedback/archive.json`.
+   - Implemented `Consider: Archive Resolved`.
+   - Resolved comments are moved from active `.consider/store.json` into `.consider/archive.json`.
    - Archive writes use atomic temp-file + rename.
    - Re-running archive with no resolved comments returns a no-op message.
 
@@ -284,8 +284,8 @@
 
 ### Implementation decisions not in the spec
 
-- **Archive file format:** `.feedback/archive.json` stores records as `{ archivedAt, comment }` to preserve audit history and timestamp of archival.
-- **Tree view filtering UX:** filter is selected via `Feedback: Show All Comments` command rather than hardcoded per-view filter controls.
+- **Archive file format:** `.consider/archive.json` stores records as `{ archivedAt, comment }` to preserve audit history and timestamp of archival.
+- **Tree view filtering UX:** filter is selected via `Consider: Show All Comments` command rather than hardcoded per-view filter controls.
 - **Open-from-tree behavior:** selecting a tree comment opens file and reveals anchor line, but does not force comment widget expansion.
 
 ### What's known to be incomplete
@@ -389,10 +389,10 @@
    - Added exported detection helpers for guided setup defaults:
      - `detectAgentIntegrations(projectRoot)`
      - `getDetectedIntegrationTargets(detection)`
-   - Setup still keeps feedback data rooted at fixed `<project-root>/.feedback/`.
+   - Setup still keeps feedback data rooted at fixed `<project-root>/.consider/`.
 
 2. **Guided setup UX in extension command path** (`extension/src/extension.ts`)
-   - `Feedback: Setup Agent Integration` is now a guided flow:
+   - `Consider: Setup Agent Integration` is now a guided flow:
      - shows a single setup panel that includes `.gitignore` choice,
      - includes checkboxes for Claude/OpenCode/Codex,
      - includes workspace/home scope switches per selected integration in that same panel,
@@ -400,7 +400,7 @@
    - Setup completion message now reports selected/updated/skipped actions clearly.
 
 3. **First-run discoverability prompt** (`extension/src/extension.ts`)
-   - On workspace activation without `.feedback/store.json`, extension shows a one-time prompt:
+   - On workspace activation without `.consider/store.json`, extension shows a one-time prompt:
      - `Set Up Now`
      - `Later`
    - Prompt is suppressed in extension test mode to avoid host-test flakiness.
@@ -426,10 +426,10 @@
 
 7. **CLI deployment hardening for ESM repos** (`extension/src/setup.ts`, `test/extension/setup.test.ts`)
    - Setup now deploys a module-type-invariant launcher path:
-     - writes `.feedback/bin/feedback-cli.cjs`,
-     - rewrites `.feedback/bin/feedback-cli` to execute `feedback-cli.cjs`.
-   - Setup now copies required shared runtime modules into `.feedback/shared/` so deployed CLI imports resolve correctly.
-   - Setup now writes `.feedback/bin/package.json` and `.feedback/shared/package.json` with `"type": "commonjs"` so direct `.js` execution and shared imports remain stable inside ESM repositories.
+     - writes `.consider/bin/consider-cli.cjs`,
+     - rewrites `.consider/bin/consider-cli` to execute `consider-cli.cjs`.
+   - Setup now copies required shared runtime modules into `.consider/shared/` so deployed CLI imports resolve correctly.
+   - Setup now writes `.consider/bin/package.json` and `.consider/shared/package.json` with `"type": "commonjs"` so direct `.js` execution and shared imports remain stable inside ESM repositories.
    - Added an automated test that executes the deployed CLI in a project with `package.json` `"type": "module"` and verifies it runs.
 
 8. **Thread-first guidance for non-actionable feedback** (`extension/src/setup.ts`, `docs/spec.md`)
@@ -443,13 +443,13 @@
 
 ### Implementation decisions not in the spec
 
-1. **Setup prompt cadence:** first-run prompt is shown once per workspace state when `.feedback/store.json` is missing.
+1. **Setup prompt cadence:** first-run prompt is shown once per workspace state when `.consider/store.json` is missing.
 2. **Guided defaults:** users can skip integrations explicitly; no implicit integration writes occur.
 3. **Skill install scope:** setup supports project-local and home-level install locations per selected integration in the same run.
 4. **Codex integration path:** Codex setup writes a skill file under `.codex/skills/consider/SKILL.md`; setup does not append content into `AGENTS.md`/`CLAUDE.md`.
-5. **No custom store path in v1:** `.feedback/` remains fixed at project root for compatibility with existing CLI/store assumptions.
+5. **No custom store path in v1:** `.consider/` remains fixed at project root for compatibility with existing CLI/store assumptions.
 6. **Agent-specific formatting baseline:** setup now enforces a shared valid frontmatter shape (`name: consider`, `description: ...`) before markdown content.
-7. **Module-type invariance in deployed CLI:** setup emits a `.cjs` runtime entrypoint and copies shared modules under `.feedback/shared/` to avoid ESM/CJS and relative-import breakage in target repositories.
+7. **Module-type invariance in deployed CLI:** setup emits a `.cjs` runtime entrypoint and copies shared modules under `.consider/shared/` to avoid ESM/CJS and relative-import breakage in target repositories.
 
 ### What's known to be incomplete
 
@@ -464,20 +464,20 @@
 ### What was built
 
 1. **Tracked install state in setup config** (`extension/src/setup.ts`)
-   - Setup now writes `.feedback/config.json` during setup runs.
+   - Setup now writes `.consider/config.json` during setup runs.
    - Config tracks installed skill locations with target + scope + absolute path.
    - Repeated setup runs merge tracked installs idempotently.
 
 2. **Uninstall core behavior** (`extension/src/setup.ts`)
    - Added `runUninstallAgentIntegration(projectRoot, options)` to support deterministic cleanup.
    - Supports two modes:
-     - full uninstall (remove `.feedback/` and tracked skills),
-     - skills-only uninstall (remove tracked skills, keep `.feedback/`).
-   - Removes `.feedback/` entry from `.gitignore` when requested.
+     - full uninstall (remove `.consider/` and tracked skills),
+     - skills-only uninstall (remove tracked skills, keep `.consider/`).
+   - Removes `.consider/` entry from `.gitignore` when requested.
    - Includes fallback skill discovery for older installs that predate config tracking.
 
 3. **Extension uninstall command flow** (`extension/src/extension.ts`, `extension/package.json`)
-   - Added command: `Feedback: Uninstall`.
+   - Added command: `Consider: Uninstall`.
    - Added guided uninstall choices with explicit confirmation:
      - full uninstall,
      - skills-only uninstall.
@@ -504,7 +504,7 @@
 
 ### Implementation decisions not in the spec
 
-1. **Config path ownership:** uninstall tracking state is stored in `.feedback/config.json` (same gitignored root as store/runtime files).
+1. **Config path ownership:** uninstall tracking state is stored in `.consider/config.json` (same gitignored root as store/runtime files).
 2. **Fallback compatibility:** uninstall attempts fallback detection for known skill paths when tracking metadata is missing, to support older installs.
 3. **Safety scope:** uninstall removes only tracked Consider skill directories (`.../skills/consider`) and leaves agent root directories in place.
 
@@ -532,7 +532,7 @@
    - Resolved threads can become stale/orphaned when files change/delete.
    - Successful re-anchor sets `anchorState=anchored` without reopening workflow state.
 
-3. **CLI workflow/anchor UX + reopen command** (`cli/feedback-cli.js`)
+3. **CLI workflow/anchor UX + reopen command** (`cli/consider-cli.js`)
    - `list` now supports `--workflow`, `--anchor`, and `--unseen`.
    - Kept `--status` as a legacy alias for backward compatibility.
    - Added `unresolve <comment-id>`.
@@ -542,7 +542,7 @@
 4. **Extension rendering and actions aligned with split model** (`extension/src/extension.ts`, `extension/src/tree-data.ts`, `extension/src/archive.ts`, `extension/package.json`)
    - Thread labels now render workflow state (`Open`/`Resolved`) and anchor reliability (`Stale Anchor`/`Missing File`).
    - Resolve/Reopen actions are controlled by workflow state.
-   - Feedback Comments tree now shows workflow + anchor in descriptions and filters accordingly.
+   - Consider Comments tree now shows workflow + anchor in descriptions and filters accordingly.
    - Archive now archives by `workflowState=resolved`.
 
 5. **Skill guidance + command docs updated** (`extension/src/setup.ts`)
@@ -595,12 +595,12 @@
    - Added minimal source fixture (`src/sample.ts`) used by click-level smoke flows.
 
 3. **Expanded end-to-end UI smoke scenarios** (`extension/test-ui/suite/smoke.test.js`)
-   - Runs guided setup from the setup webview submit path and verifies scaffold outputs (`.feedback/store.json`, `.feedback/config.json`, deployed CLI/shared runtime files, and `.gitignore` entry).
+   - Runs guided setup from the setup webview submit path and verifies scaffold outputs (`.consider/store.json`, `.consider/config.json`, deployed CLI/shared runtime files, and `.gitignore` entry).
    - Adds a comment through the command palette flow and verifies persisted store records.
    - Executes CLI reply from the same workspace and asserts watcher-driven thread rendering in the editor.
    - Exercises resolve/unresolve lifecycle across UI + CLI transitions and verifies workflow state persistence.
-   - Archives resolved comments from the command flow and verifies movement from active store into `.feedback/archive.json`.
-   - Runs full uninstall from the command flow and verifies `.feedback` removal plus `.gitignore` cleanup.
+   - Archives resolved comments from the command flow and verifies movement from active store into `.consider/archive.json`.
+   - Runs full uninstall from the command flow and verifies `.consider` removal plus `.gitignore` cleanup.
 
 4. **Scripts and CI wiring**
    - Added extension script: `npm run test:ui:smoke`.
@@ -639,3 +639,36 @@
 ### What's known to be incomplete
 
 1. **Coverage breadth is still selective:** smoke now covers core lifecycle paths, but additional UX paths (advanced filtering toggles, comments panel edge interactions, and reconciliation-heavy edit sequences) should still be added incrementally.
+
+---
+
+## Post-Phase: Naming Migration (Feedback -> Consider)
+
+**Status:** Complete
+
+### What was built
+
+1. Renamed the primary runtime artifacts:
+   - project data directory from `.feedback/` to `.consider/`,
+   - CLI executable from `feedback-cli` to `consider-cli`,
+   - deployed CLI/runtime paths under `.consider/bin/` and `.consider/shared/`.
+2. Updated extension command labels and view naming to user-facing `Consider:*` terminology.
+3. Updated extension setup/uninstall flows, skill templates, and docs/manual test instructions to use `.consider` and `consider-cli`.
+4. Updated CLI tests, extension tests, integration tests, and UI smoke tests to assert the new paths/command labels.
+
+### What was tested
+
+1. `npm test` (passes).
+2. `npm run test:extension:host` (passes).
+
+### Implementation decisions not in the spec
+
+1. **Legacy store compatibility retained:** runtime store resolution now prefers `.consider` but falls back to legacy `.feedback` when needed.
+2. **Setup auto-migrates legacy data directory:** if `.feedback/` exists and `.consider/` does not, setup renames `.feedback/` to `.consider/`.
+3. **Dual watcher + activation compatibility:** the extension watches and activates on both `.consider/store.json` and legacy `.feedback/store.json` to avoid breaking existing workspaces before setup reruns.
+4. **Gitignore cleanup behavior:** setup removes legacy `.feedback` ignore entries while adding `.consider/` and uninstall removes both entries.
+5. **Uninstall cleanup behavior:** full uninstall removes both `.consider/` and legacy `.feedback/` when present.
+
+### What's known to be incomplete
+
+1. **Legacy artifact shims are not shipped:** old `feedback-cli` wrappers are intentionally removed in favor of clean naming; legacy compatibility is provided at store-path level and setup migration flow.

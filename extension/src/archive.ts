@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { FeedbackComment, FeedbackStore } from './store';
+import { FeedbackComment, FeedbackStore, storeDirectoryPath } from './store';
 
 const ARCHIVE_VERSION = 1;
 
@@ -22,7 +22,7 @@ export interface ArchiveResolvedResult {
 }
 
 function archiveStorePath(projectRoot: string): string {
-  return path.join(projectRoot, '.feedback', 'archive.json');
+  return path.join(storeDirectoryPath(projectRoot), 'archive.json');
 }
 
 function emptyArchive(): FeedbackArchiveStore {

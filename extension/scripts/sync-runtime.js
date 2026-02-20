@@ -23,7 +23,7 @@ function main() {
   copyFiles(
     path.join(repositoryRoot, 'cli'),
     path.join(extensionRoot, 'runtime', 'cli'),
-    ['feedback-cli', 'feedback-cli.js']
+    ['consider-cli', 'consider-cli.js']
   );
   copyFiles(
     path.join(repositoryRoot, 'shared'),

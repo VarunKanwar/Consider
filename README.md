@@ -1,59 +1,84 @@
 # Consider
 
-A VS Code extension and CLI tool that brings GitHub PR-style inline code review to local development, designed for communication between a human developer and an AI coding agent.
+_Consider_ adds code-review-style comment threads to local files in VS Code, and enables agents to participate via [skills](https://code.claude.com/docs/en/skills). Iterate on design and implementation in place, with discussions anchored to the exact lines they refer to.
 
-## The problem
+TODO: GIF showing the flow of comment creation in the editor -> skill invocation -> agent response in the thread
 
-When you're working with an AI coding agent (Claude Code, Codex, OpenCode), reviewing its output means opening files in VS Code and leaving feedback. Today, developers resort to inserting sentinel comments directly in code (`// FEEDBACK: handle the error case here`), polluting the codebase and fragmenting the conversation between inline notes and the agent's chat interface.
+## Quickstart:
 
-## What this does
+- VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=consider
+- Open the command palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run `Consider: Setup Agent Integration` to configure your agent integrations.
+  - This will create a `.consider/` directory and optionally add it to `.gitignore`.
+  - This will also install a `/consider` skill on selected agents, allowing them to read and write comments.
 
-Consider provides an annotation layer that sits *on top of* your code, not inside it:
 
-- **Developer** adds inline comments in VS Code, anchored to specific lines or ranges — just like a GitHub PR review.
-- **Agent** reads and replies to those comments via a CLI tool (`feedback-cli`).
-- **Threads** are anchored to code locations but stored in a gitignored `.feedback/` directory. Git never sees them.
-- **Anchors** survive code edits — if the agent moves code around, the system re-anchors comments to their new locations (or flags them as stale if the code changed too much).
 
-No git pollution. No manual line numbers. No chat clutter.
+- Inline comments anchored to line/range.
+- Agent replies from terminal via `consider-cli`.
+- Shared local store at `.consider/store.json`.
+- Content-based re-anchoring after edits.
 
-## Architecture
+## 60-Second First Loop
 
+1. Open your workspace in VS Code with Consider active.
+2. Run `Consider: Setup Agent Integration`.
+3. In setup, choose:
+   - whether to add `.consider/` to `.gitignore`,
+   - which integrations to install,
+   - workspace vs home install scope for each selected integration.
+4. Add a comment from the editor gutter `+` or run `Add Comment`.
+5. In terminal, list open feedback:
+   ```sh
+   .consider/bin/consider-cli list
+   ```
+6. Reply as the agent:
+   ```sh
+   .consider/bin/consider-cli reply <comment-id> --message "I will update this."
+   ```
+7. Resolve when done:
+   ```sh
+   .consider/bin/consider-cli resolve <comment-id>
+   ```
+
+## Agent Command Reference
+
+```sh
+.consider/bin/consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]
+.consider/bin/consider-cli get <comment-id> [--json]
+.consider/bin/consider-cli context <comment-id> [--lines N] [--json]
+.consider/bin/consider-cli reply <comment-id> --message "..."
+.consider/bin/consider-cli resolve <comment-id>
+.consider/bin/consider-cli unresolve <comment-id>
+.consider/bin/consider-cli summary [--json]
 ```
-VS Code Extension ←→ .feedback/store.json ←→ CLI Tool (used by agents)
-```
 
-Three components share a single JSON store via the filesystem. The extension writes comments; the CLI reads them. The CLI writes replies; the extension renders them. No IPC, no server, no protocol — just a file.
+## Trust And Boundaries
+
+- Comment data stays local in fixed project path `.consider/`.
+- `.consider/` can be added to `.gitignore` during setup.
+- Core workflow is filesystem-only: no server, no IPC.
+- Agent integration files are explicit opt-in in setup and removable via `Consider: Uninstall`.
+
+## Architecture (One Line)
+
+```text
+VS Code Extension <-> .consider/store.json <-> consider-cli
+```
 
 ## Status
 
-Under active development. See `docs/spec.md` for the full technical specification and `docs/progress.md` for current build status.
+Under active development.
 
-Known product constraints and upstream limitations are tracked in one place: `docs/known-limitations.md`.
+- Build progress: `docs/progress.md`
+- Current limitations: `docs/known-limitations.md`
 
-## Quick Start (Current)
+## Documentation Map
 
-1. Open a workspace in VS Code with the Consider extension active.
-2. Run **Feedback: Setup Agent Integration** from the Command Palette.
-3. In setup, choose:
-   - in one setup panel, whether to add `.feedback/` to `.gitignore`,
-   - which integrations to install (checkboxes),
-   - for each selected integration, whether to install in workspace or home (switch).
-4. Start leaving inline feedback in files (gutter `+`), then use `.feedback/bin/feedback-cli` for agent-side replies.
-
-Notes:
-- Feedback data stays in fixed project-local path: `.feedback/`.
-- Agent integrations are explicit opt-in during setup, with per-integration install scope selection.
-- Offboarding is available via **Feedback: Uninstall** (full uninstall or skills-only mode).
-
-## Documentation
-
-- **`docs/spec.md`** — Complete technical specification: problem statement, architecture, data model, anchoring algorithm, agent integration, build phases.
-- **`docs/progress.md`** — Build log tracking phase completion and implementation decisions.
-- **`docs/known-limitations.md`** — Canonical list of current limitations and upstream constraints.
-- **`docs/manual-testing.md`** — Step-by-step manual testing procedures.
-- **`docs/testing-strategy.md`** — Repository-wide testing policy, merge gate, and integration-test roadmap.
-- **`AGENTS.md`** — Development instructions for AI coding agents working on this repo.
+- Start here as a user: `extension/README.md`
+- Full specification: `docs/spec.md`
+- Manual test flows: `docs/manual-testing.md`
+- Testing policy: `docs/testing-strategy.md`
+- Agent contributor instructions: `AGENTS.md`
 
 ## License
 

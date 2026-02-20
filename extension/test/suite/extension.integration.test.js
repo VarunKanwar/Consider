@@ -80,7 +80,7 @@ async function addCommentViaPayload(root, text, controllers) {
     thread,
   });
 
-  const storePath = path.join(root, '.feedback', 'store.json');
+  const storePath = path.join(root, '.consider', 'store.json');
   const store = readJson(storePath);
   const inserted = store.comments.find((comment) => comment.body === text);
   assert.ok(inserted, 'Expected inserted comment in store.');
@@ -110,7 +110,7 @@ suite('Consider Extension Host', () => {
 
   setup(async () => {
     const root = workspaceRoot();
-    removeIfExists(path.join(root, '.feedback'));
+    removeIfExists(path.join(root, '.consider'));
     removeIfExists(path.join(root, '.claude'));
     removeIfExists(path.join(root, '.opencode'));
     removeIfExists(path.join(root, '.codex'));
@@ -135,16 +135,16 @@ suite('Consider Extension Host', () => {
     const root = workspaceRoot();
     await vscode.commands.executeCommand('consider.setupAgentIntegration');
 
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'config.json')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli.js')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'feedback-cli.cjs')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'bin', 'package.json')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'shared', 'store.js')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'shared', 'reconcile.js')));
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'shared', 'package.json')));
-    assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf-8').includes('.feedback/'));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'store.json')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'config.json')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'bin', 'consider-cli')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'bin', 'consider-cli.js')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'bin', 'consider-cli.cjs')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'bin', 'package.json')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'shared', 'store.js')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'shared', 'reconcile.js')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'shared', 'package.json')));
+    assert.ok(fs.readFileSync(path.join(root, '.gitignore'), 'utf-8').includes('.consider/'));
     assert.ok(!fs.existsSync(path.join(root, '.claude')));
     assert.ok(!fs.existsSync(path.join(root, '.opencode')));
     assert.ok(!fs.existsSync(path.join(root, '.codex')));
@@ -187,7 +187,7 @@ suite('Consider Extension Host', () => {
       'Integration test comment',
       controllers
     );
-    const store = readJson(path.join(root, '.feedback', 'store.json'));
+    const store = readJson(path.join(root, '.consider', 'store.json'));
     const inserted = store.comments.find((comment) => comment.id === commentId);
     assert.ok(inserted, 'Expected inserted comment to still exist in store.');
     assert.equal(inserted.workflowState, 'open');
@@ -250,7 +250,7 @@ suite('Consider Extension Host', () => {
     );
 
     await vscode.commands.executeCommand('consider.resolveThread', thread);
-    let store = readJson(path.join(root, '.feedback', 'store.json'));
+    let store = readJson(path.join(root, '.consider', 'store.json'));
     let comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after resolve command.');
     assert.equal(comment.workflowState, 'resolved');
@@ -260,13 +260,13 @@ suite('Consider Extension Host', () => {
       thread,
       text: 'should be blocked while resolved',
     });
-    store = readJson(path.join(root, '.feedback', 'store.json'));
+    store = readJson(path.join(root, '.consider', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after blocked reply.');
     assert.equal(comment.thread.length, 0);
 
     await vscode.commands.executeCommand('consider.unresolveThread', thread);
-    store = readJson(path.join(root, '.feedback', 'store.json'));
+    store = readJson(path.join(root, '.consider', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after reopen command.');
     assert.equal(comment.workflowState, 'open');
@@ -390,16 +390,16 @@ suite('Consider Extension Host', () => {
     });
 
     const codexSkill = path.join(root, '.codex', 'skills', 'consider', 'SKILL.md');
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'store.json')));
     assert.ok(fs.existsSync(codexSkill));
 
     const skillsOnly = runUninstallAgentIntegration(root, {
-      removeFeedbackDir: false,
+      removeConsiderDir: false,
       removeGitignoreEntry: false,
       homeDir: fakeHome,
     });
-    assert.equal(skillsOnly.feedbackDirRemoved, false);
-    assert.ok(fs.existsSync(path.join(root, '.feedback', 'store.json')));
+    assert.equal(skillsOnly.considerDirRemoved, false);
+    assert.ok(fs.existsSync(path.join(root, '.consider', 'store.json')));
     assert.ok(!fs.existsSync(codexSkill));
 
     runSetupAgentIntegration(root, {
@@ -412,7 +412,7 @@ suite('Consider Extension Host', () => {
     assert.ok(fs.existsSync(claudeSkill));
 
     await vscode.commands.executeCommand('consider.uninstallAgentIntegration');
-    assert.ok(!fs.existsSync(path.join(root, '.feedback')));
+    assert.ok(!fs.existsSync(path.join(root, '.consider')));
     assert.ok(!fs.existsSync(claudeSkill));
   });
 
@@ -433,13 +433,13 @@ suite('Consider Extension Host', () => {
     );
 
     await vscode.commands.executeCommand('consider.reconcileAll');
-    let store = readJson(path.join(root, '.feedback', 'store.json'));
+    let store = readJson(path.join(root, '.consider', 'store.json'));
     let comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after stale transition.');
     assert.equal(comment.anchorState, 'stale');
     await waitFor(
       () =>
-        thread.contextValue === 'feedback-thread-open-stale' &&
+        thread.contextValue === 'consider-thread-open-stale' &&
         typeof thread.label === 'string' &&
         thread.label.includes('Stale'),
       'thread stale status presentation'
@@ -447,13 +447,13 @@ suite('Consider Extension Host', () => {
 
     fs.unlinkSync(samplePath);
     await vscode.commands.executeCommand('consider.reconcileAll');
-    store = readJson(path.join(root, '.feedback', 'store.json'));
+    store = readJson(path.join(root, '.consider', 'store.json'));
     comment = store.comments.find((entry) => entry.id === commentId);
     assert.ok(comment, 'Expected comment after orphan transition.');
     assert.equal(comment.anchorState, 'orphaned');
     await waitFor(
       () =>
-        thread.contextValue === 'feedback-thread-open-orphaned' &&
+        thread.contextValue === 'consider-thread-open-orphaned' &&
         typeof thread.label === 'string' &&
         thread.label.includes('Orphaned'),
       'thread orphaned status presentation'
@@ -464,7 +464,7 @@ suite('Consider Extension Host', () => {
     const root = workspaceRoot();
     await vscode.commands.executeCommand('consider.setupAgentIntegration');
 
-    const storePath = path.join(root, '.feedback', 'store.json');
+    const storePath = path.join(root, '.consider', 'store.json');
     const store = readJson(storePath);
     store.comments = [
       {
@@ -498,7 +498,7 @@ suite('Consider Extension Host', () => {
     assert.equal(nextStore.comments.length, 1);
     assert.equal(nextStore.comments[0].id, 'c_open_1');
 
-    const archive = readJson(path.join(root, '.feedback', 'archive.json'));
+    const archive = readJson(path.join(root, '.consider', 'archive.json'));
     const archivedResolved = archive.comments.find(
       (entry) => entry.comment.id === 'c_resolved_1'
     );

@@ -34,13 +34,13 @@ function makeCliSource(baseDir) {
   fs.mkdirSync(sharedDir, { recursive: true });
   writeFile(
     baseDir,
-    'cli-src/feedback-cli',
-    '#!/bin/sh\nexec node "$(dirname "$0")/feedback-cli.js" "$@"\n'
+    'cli-src/consider-cli',
+    '#!/bin/sh\nexec node "$(dirname "$0")/consider-cli.js" "$@"\n'
   );
   writeFile(
     baseDir,
-    'cli-src/feedback-cli.js',
-    '#!/usr/bin/env node\nconsole.log("feedback-cli stub");\n'
+    'cli-src/consider-cli.js',
+    '#!/usr/bin/env node\nconsole.log("consider-cli stub");\n'
   );
   writeFile(
     baseDir,
@@ -98,7 +98,7 @@ describe('setup agent integration', () => {
   it('creates feedback scaffolding and deploys CLI without writing integrations by default', () => {
     const result = runSetupAgentIntegration(projectRoot, { cliSourceDir });
 
-    assert.equal(result.feedbackDirCreated, true);
+    assert.equal(result.considerDirCreated, true);
     assert.equal(result.binDirCreated, true);
     assert.equal(result.storeCreated, true);
     assert.equal(result.gitignoreUpdated, true);
@@ -107,21 +107,21 @@ describe('setup agent integration', () => {
     assert.equal(result.integrationTargetsRequested.length, 0);
     assert.equal(result.integrationInstallsRequested.length, 0);
 
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'store.json')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli.js')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli.cjs')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'bin', 'package.json')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'store.js')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'reconcile.js')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'shared', 'package.json')));
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'config.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'store.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'bin', 'consider-cli')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'bin', 'consider-cli.js')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'bin', 'consider-cli.cjs')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'bin', 'package.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'shared', 'store.js')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'shared', 'reconcile.js')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'shared', 'package.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'config.json')));
     assert.ok(
       fs
-        .readFileSync(path.join(projectRoot, '.feedback', 'bin', 'feedback-cli'), 'utf-8')
-        .includes('feedback-cli.cjs')
+        .readFileSync(path.join(projectRoot, '.consider', 'bin', 'consider-cli'), 'utf-8')
+        .includes('consider-cli.cjs')
     );
-    assert.ok(read('.gitignore', projectRoot).includes('.feedback/'));
+    assert.ok(read('.gitignore', projectRoot).includes('.consider/'));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.claude')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.codex')));
@@ -248,7 +248,7 @@ describe('setup agent integration', () => {
     );
   });
 
-  it('tracks installed skill locations in .feedback/config.json', () => {
+  it('tracks installed skill locations in .consider/config.json', () => {
     const controlledHome = path.join(projectRoot, 'fake-home');
     fs.mkdirSync(controlledHome, { recursive: true });
 
@@ -261,7 +261,7 @@ describe('setup agent integration', () => {
       homeDir: controlledHome,
     });
 
-    const config = readJson('.feedback/config.json', projectRoot);
+    const config = readJson('.consider/config.json', projectRoot);
     assert.equal(config.version, 1);
     assert.ok(Array.isArray(config.trackedSkillInstalls));
     assert.ok(
@@ -292,7 +292,7 @@ describe('setup agent integration', () => {
 
     assert.ok(result.cliCopied.length >= 5);
     const run = require('child_process').spawnSync(
-      path.join(projectRoot, '.feedback', 'bin', 'feedback-cli'),
+      path.join(projectRoot, '.consider', 'bin', 'consider-cli'),
       ['summary'],
       {
         cwd: projectRoot,
@@ -301,7 +301,7 @@ describe('setup agent integration', () => {
     );
     assert.equal(run.status, 0, run.stderr);
     assert.ok(
-      run.stdout.includes('No feedback comments.') ||
+      run.stdout.includes('No comments.') ||
       run.stdout.includes('Open comments: 0')
     );
   });
@@ -322,14 +322,14 @@ describe('setup agent integration', () => {
     assert.equal(first.integrationTargetsRequested[0], 'codex');
 
     const gitignore = read('.gitignore', projectRoot);
-    assert.equal(countOccurrences(gitignore, '.feedback/'), 1);
+    assert.equal(countOccurrences(gitignore, '.consider/'), 1);
 
     const codexSkill = read('.codex/skills/consider/SKILL.md', projectRoot);
     assertHasSkillFrontmatter(codexSkill);
     assert.equal(countOccurrences(codexSkill, '\nname: consider\n'), 1);
   });
 
-  it('uninstalls tracked skills, removes gitignore entry, and deletes .feedback by default', () => {
+  it('uninstalls tracked skills, removes gitignore entry, and deletes .consider by default', () => {
     const controlledHome = path.join(projectRoot, 'fake-home');
     fs.mkdirSync(controlledHome, { recursive: true });
 
@@ -344,42 +344,42 @@ describe('setup agent integration', () => {
 
     const result = runUninstallAgentIntegration(projectRoot, {
       homeDir: controlledHome,
-      removeFeedbackDir: true,
+      removeConsiderDir: true,
       removeGitignoreEntry: true,
     });
 
     assert.equal(result.configFound, true);
-    assert.equal(result.feedbackDirRemoved, true);
+    assert.equal(result.considerDirRemoved, true);
     assert.equal(result.gitignoreUpdated, true);
     assert.equal(result.skillsRemoved.length, 2);
-    assert.ok(!fs.existsSync(path.join(projectRoot, '.feedback')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.consider')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.claude', 'skills', 'consider')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.claude')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.claude', 'skills')));
     assert.ok(!fs.existsSync(path.join(controlledHome, '.opencode', 'skills', 'consider')));
     assert.ok(fs.existsSync(path.join(controlledHome, '.opencode')));
     assert.ok(fs.existsSync(path.join(controlledHome, '.opencode', 'skills')));
-    assert.equal(read('.gitignore', projectRoot).includes('.feedback/'), false);
+    assert.equal(read('.gitignore', projectRoot).includes('.consider/'), false);
   });
 
-  it('supports skills-only uninstall and preserves .feedback data', () => {
+  it('supports skills-only uninstall and preserves .consider data', () => {
     runSetupAgentIntegration(projectRoot, {
       cliSourceDir,
       integrationTargets: ['codex'],
     });
 
     const result = runUninstallAgentIntegration(projectRoot, {
-      removeFeedbackDir: false,
+      removeConsiderDir: false,
       removeGitignoreEntry: false,
     });
 
-    assert.equal(result.feedbackDirRemoved, false);
+    assert.equal(result.considerDirRemoved, false);
     assert.equal(result.gitignoreSkipped, true);
-    assert.ok(fs.existsSync(path.join(projectRoot, '.feedback', 'store.json')));
+    assert.ok(fs.existsSync(path.join(projectRoot, '.consider', 'store.json')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.codex', 'skills', 'consider')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.codex')));
     assert.ok(fs.existsSync(path.join(projectRoot, '.codex', 'skills')));
-    const config = readJson('.feedback/config.json', projectRoot);
+    const config = readJson('.consider/config.json', projectRoot);
     assert.deepEqual(config.trackedSkillInstalls, []);
   });
 
@@ -406,7 +406,7 @@ describe('setup agent integration', () => {
     );
 
     const result = runUninstallAgentIntegration(projectRoot, {
-      removeFeedbackDir: false,
+      removeConsiderDir: false,
       removeGitignoreEntry: false,
     });
 

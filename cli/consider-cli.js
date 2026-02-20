@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * feedback-cli — CLI tool for AI agents to read/write inline code feedback.
+ * consider-cli — CLI tool for AI agents to read/write inline code feedback.
  * Zero npm dependencies. Node builtins only.
  *
  * Commands:
@@ -224,7 +224,7 @@ function cmdList(projectRoot, flags) {
 }
 
 function cmdGet(projectRoot, commentId, flags) {
-  if (!commentId) die('Usage: feedback-cli get <comment-id>');
+  if (!commentId) die('Usage: consider-cli get <comment-id>');
 
   const data = loadStoreForRead(projectRoot);
   const comment = store.findComment(data, commentId);
@@ -253,7 +253,7 @@ function cmdGet(projectRoot, commentId, flags) {
 }
 
 function cmdReply(projectRoot, commentId, flags) {
-  if (!commentId) die('Usage: feedback-cli reply <comment-id> --message "..."');
+  if (!commentId) die('Usage: consider-cli reply <comment-id> --message "..."');
   if (!flags.message) die('--message is required for reply command.');
   let replyId = '';
 
@@ -288,7 +288,7 @@ function cmdReply(projectRoot, commentId, flags) {
 }
 
 function cmdResolve(projectRoot, commentId) {
-  if (!commentId) die('Usage: feedback-cli resolve <comment-id>');
+  if (!commentId) die('Usage: consider-cli resolve <comment-id>');
   let alreadyResolved = false;
 
   store.mutateStore(projectRoot, data => {
@@ -316,7 +316,7 @@ function cmdResolve(projectRoot, commentId) {
 }
 
 function cmdUnresolve(projectRoot, commentId) {
-  if (!commentId) die('Usage: feedback-cli unresolve <comment-id>');
+  if (!commentId) die('Usage: consider-cli unresolve <comment-id>');
   let alreadyOpen = false;
 
   store.mutateStore(projectRoot, data => {
@@ -377,7 +377,7 @@ function cmdSummary(projectRoot, flags) {
   }
 
   if (comments.length === 0) {
-    process.stdout.write('No feedback comments.\n');
+    process.stdout.write('No comments.\n');
     return;
   }
 
@@ -404,7 +404,7 @@ function cmdSummary(projectRoot, flags) {
 }
 
 function cmdContext(projectRoot, commentId, flags) {
-  if (!commentId) die('Usage: feedback-cli context <comment-id>');
+  if (!commentId) die('Usage: consider-cli context <comment-id>');
 
   const data = loadStoreForRead(projectRoot);
   const comment = store.findComment(data, commentId);
@@ -470,9 +470,9 @@ function cmdContext(projectRoot, commentId, flags) {
 }
 
 function printHelp() {
-  process.stdout.write(`feedback-cli — Inline code feedback for AI agents
+  process.stdout.write(`consider-cli — Inline code feedback for AI agents
 
-Usage: feedback-cli <command> [options]
+Usage: consider-cli <command> [options]
 
 Commands:
   list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--status open|resolved|stale|orphaned|all] [--unseen] [--file <path>] [--json]
@@ -535,14 +535,14 @@ function main() {
         cmdContext(projectRoot, positional[0], flags);
         break;
       default:
-        die(`Unknown command: ${command}. Run feedback-cli --help for usage.`);
+        die(`Unknown command: ${command}. Run consider-cli --help for usage.`);
     }
   } catch (err) {
     if (err && err.code === 'ESTORELOCKTIMEOUT') {
-      die('Feedback store is busy. Retry in a moment.');
+      die('Consider store is busy. Retry in a moment.');
     }
     if (err && err.code === 'ESTORECONFLICT') {
-      die('Feedback store changed during update. Retry the command.');
+      die('Consider store changed during update. Retry the command.');
     }
     if (err && typeof err.message === 'string') {
       die(err.message);

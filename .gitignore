@@ -2,7 +2,7 @@ node_modules/
 dist/
 out/
 test/out/
-.feedback/
+.consider/
 *.vsix
 *.tgz
 .DS_Store

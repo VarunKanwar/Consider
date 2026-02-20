@@ -9,6 +9,8 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 
 export const STORE_VERSION = 1;
+export const STORE_DIR_NAME = '.consider';
+export const LEGACY_STORE_DIR_NAME = '.feedback';
 
 // --- Data model types ---
 
@@ -187,8 +189,22 @@ function normalizeStore(data: FeedbackStore): FeedbackStore {
 
 // --- Store operations ---
 
+export function resolveStoreDirectoryName(projectRoot: string): string {
+  if (fs.existsSync(path.join(projectRoot, STORE_DIR_NAME))) {
+    return STORE_DIR_NAME;
+  }
+  if (fs.existsSync(path.join(projectRoot, LEGACY_STORE_DIR_NAME))) {
+    return LEGACY_STORE_DIR_NAME;
+  }
+  return STORE_DIR_NAME;
+}
+
+export function storeDirectoryPath(projectRoot: string): string {
+  return path.join(projectRoot, resolveStoreDirectoryName(projectRoot));
+}
+
 export function storePath(projectRoot: string): string {
-  return path.join(projectRoot, '.feedback', 'store.json');
+  return path.join(storeDirectoryPath(projectRoot), 'store.json');
 }
 
 export function emptyStore(): FeedbackStore {

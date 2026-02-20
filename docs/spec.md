@@ -20,7 +20,7 @@ When the developer needs to review code or specs that the agent has produced (or
 
 Today, the developer works around this by inserting sentinel comments (e.g., `FEEDBACK: this function should handle the error case`) directly into the file, then asking the agent to scan for them. The agent responds in the chat interface, referencing line numbers. This creates a fragmented experience:
 
-- Feedback lives in the file itself, polluting the codebase and git history.
+- Comment data lives in the file itself, polluting the codebase and git history.
 - Agent responses live in chat, disconnected from the code locations they reference.
 - The developer must mentally map between chat responses and file locations.
 - There is no threading — a back-and-forth about a specific piece of feedback sprawls across the main conversation.
@@ -35,11 +35,11 @@ A system that provides a GitHub PR review-like annotation layer for local develo
 
 These are non-negotiable requirements that were established during design discussions.
 
-**C1: No git pollution.** Feedback must not appear in `git status`, `git diff`, or any git operation. The feedback store, CLI tool, and all metadata must be invisible to git. This means everything lives in gitignored directories.
+**C1: No git pollution.** Comment data must not appear in `git status`, `git diff`, or any git operation. The feedback store, CLI tool, and all metadata must be invisible to git. This means everything lives in gitignored directories.
 
 **C2: No manual line-number references.** The developer should never have to type "on line 45, I think..." — the UI handles the association between comments and code locations. The developer clicks on a line (or selects a range), writes their comment, and the system records the location.
 
-**C3: Feedback is not code.** The developer should not have to write comments in source-code syntax, insert sentinel values, or otherwise modify files to communicate with the agent. The annotation layer is entirely separate from the files it annotates.
+**C3: Comment data is not code.** The developer should not have to write comments in source-code syntax, insert sentinel values, or otherwise modify files to communicate with the agent. The annotation layer is entirely separate from the files it annotates.
 
 **C4: Preserve the main conversation.** The developer already has a conversation with the agent in a terminal, sidebar, or other interface. Consider should not replace that conversation — it should complement it. Inline comment threads are a *separate channel* for located, specific feedback. The main conversation remains the primary interaction surface.
 
@@ -64,7 +64,7 @@ The system has three components:
                        │ reads/writes
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│                Feedback Store (.feedback/)                │
+│                 Comment Store (.consider/)                │
 │                                                         │
 │  - JSON file(s) storing all comments, threads, anchors  │
 │  - Gitignored                                           │
@@ -73,7 +73,7 @@ The system has three components:
                        │ reads/writes
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│              CLI Tool (.feedback/bin/feedback-cli)        │
+│              CLI Tool (.consider/bin/consider-cli)        │
 │                                                         │
 │  - Standalone Node.js script (no dependencies)          │
 │  - Shell wrapper for ergonomic invocation               │
@@ -93,21 +93,21 @@ The **CLI** is the agent-facing interface. Agents call it via shell commands. It
 
 ---
 
-## 4. The Feedback Store
+## 4. The Comment Store
 
 ### 4.1 Location and Git Isolation
 
-The store lives at `<project-root>/.feedback/`. The setup command adds `.feedback/` to `.gitignore`.
+The store lives at `<project-root>/.consider/`. The setup command adds `.consider/` to `.gitignore`.
 
 The directory structure:
 
 ```
-.feedback/
+.consider/
 ├── store.json              # All comments, threads, and anchors
 ├── bin/
-│   ├── feedback-cli        # Shell wrapper (#!/bin/sh)
-│   ├── feedback-cli.js     # Source-compatible JS artifact
-│   ├── feedback-cli.cjs    # Runtime entrypoint (module-type invariant)
+│   ├── consider-cli        # Shell wrapper (#!/bin/sh)
+│   ├── consider-cli.js     # Source-compatible JS artifact
+│   ├── consider-cli.cjs    # Runtime entrypoint (module-type invariant)
 │   └── package.json        # {"type":"commonjs"} for local runtime scope
 ├── shared/
 │   ├── store.js            # Shared store logic used by deployed CLI
@@ -192,7 +192,7 @@ The dominant edit pattern is: the agent modifies files via the terminal (Claude 
 
 Therefore, **both** the CLI and the extension perform reconciliation, each covering a different scenario:
 
-**The CLI** performs **lazy reconciliation on every read operation**. When the agent (or anyone) calls `feedback-cli list`, `feedback-cli get`, or `feedback-cli context`, the CLI:
+**The CLI** performs **lazy reconciliation on every read operation**. When the agent (or anyone) calls `consider-cli list`, `consider-cli get`, or `consider-cli context`, the CLI:
 
 1. Reads the store.
 2. For each comment whose target file has a modification time newer than the comment's `lastAnchorCheck` timestamp, runs the re-anchoring algorithm.
@@ -228,7 +228,7 @@ Stale and orphaned comments are not deleted; they are flagged for review regardl
 
 ### 4.5 Setup Tracking Config
 
-In addition to `store.json`, setup/uninstall state is tracked in `.feedback/config.json`.
+In addition to `store.json`, setup/uninstall state is tracked in `.consider/config.json`.
 
 ```json
 {
@@ -271,23 +271,23 @@ The extension should register the following commands:
 
 **Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with `workflowState=open` and `anchorState=anchored`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
 
-**Feedback: Setup Agent Integration** — Runs a guided setup flow: initializes `.feedback/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
+**Consider: Setup Agent Integration** — Runs a guided setup flow: initializes `.consider/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
 
-On first run in a workspace without `.feedback/store.json`, the extension should surface a lightweight setup prompt so onboarding is discoverable without forcing side effects.
+On first run in a workspace without `.consider/store.json`, the extension should surface a lightweight setup prompt so onboarding is discoverable without forcing side effects.
 
-**Feedback: Uninstall** — Runs a guided offboarding flow. The developer chooses between full uninstall (remove `.feedback/` + tracked skills) or skills-only uninstall (keep `.feedback/` data). See Section 8.3.
+**Consider: Uninstall** — Runs a guided offboarding flow. The developer chooses between full uninstall (remove `.consider/` + tracked skills) or skills-only uninstall (keep `.consider/` data). See Section 8.3.
 
-**Feedback: Show All Comments** — Opens a tree view / panel showing all feedback across the project, grouped by file, with visibility toggles for resolved and stale comments. These toggles should apply to both the custom Feedback tree and the built-in VS Code comments panel by controlling thread rendering.
+**Consider: Show All Comments** — Opens a tree view / panel showing all feedback across the project, grouped by file, with visibility toggles for resolved and stale comments. These toggles should apply to both the custom Consider tree and the built-in VS Code comments panel by controlling thread rendering.
 
-**Feedback: Archive Resolved** — Moves resolved threads out of the active store (into an archive file or deletes them) to prevent unbounded growth.
+**Consider: Archive Resolved** — Moves resolved threads out of the active store (into an archive file or deletes them) to prevent unbounded growth.
 
-**Feedback: Reconcile All** — Forces a full re-anchoring pass across all comments. Useful after a large batch of changes or when the developer knows things have shifted significantly.
+**Consider: Reconcile All** — Forces a full re-anchoring pass across all comments. Useful after a large batch of changes or when the developer knows things have shifted significantly.
 
 **Why no queue or dispatch:** We considered a queue model where comments start as drafts and are explicitly dispatched. However, the extension has no mechanism to inject messages into the agent's conversation — the agent discovers feedback by running the CLI, which is always initiated from the agent's side (either by the developer prompting it, or by the skill file instructing the agent to check). Since the developer already controls timing through when they prompt the agent, a separate queue/dispatch layer adds complexity without enabling anything new. The developer does their review, adds all their comments, then tells the agent to go look. The comments are already there.
 
 ### 5.3 File Watching and Agent Response Rendering
 
-The extension watches `.feedback/store.json` for changes. When the agent writes a reply via the CLI, the store file changes, the extension detects this, and re-renders the affected comment thread — the agent's reply appears inline, just like a human's would. The agent's comments should be visually distinct (different author label, possibly different styling).
+The extension watches `.consider/store.json` for changes. When the agent writes a reply via the CLI, the store file changes, the extension detects this, and re-renders the affected comment thread — the agent's reply appears inline, just like a human's would. The agent's comments should be visually distinct (different author label, possibly different styling).
 
 This is the key mechanism for bidirectional communication: the extension writes comments, the agent reads them via CLI, writes replies via CLI, and the extension picks up the replies via file watching. No IPC, no server, no protocol — just filesystem-mediated message passing.
 
@@ -305,10 +305,10 @@ The extension does not need to re-anchor comments for files that are not open �
 
 The CLI is a standalone Node.js script with **zero npm dependencies** — only Node builtins (`fs`, `path`, `crypto`, `process`). It is invoked through a shell wrapper for ergonomic use.
 
-**Shell wrapper** (`.feedback/bin/feedback-cli`):
+**Shell wrapper** (`.consider/bin/consider-cli`):
 ```sh
 #!/bin/sh
-exec node "$(dirname "$0")/feedback-cli.cjs" "$@"
+exec node "$(dirname "$0")/consider-cli.cjs" "$@"
 ```
 
 **Why Node.js:** JSON is the native data format. Content-based anchor matching requires string similarity comparisons that are painful in pure shell. Node is guaranteed to be present for any developer using VS Code (which requires Node), and a tiny set of dependency-free runtime files requires zero installation.
@@ -316,31 +316,31 @@ exec node "$(dirname "$0")/feedback-cli.cjs" "$@"
 ### 6.2 Commands
 
 ```
-feedback-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>]
+consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>]
     List comments, optionally filtered. Default: workflow=open, anchor=all.
     Legacy alias: --status open|resolved|stale|orphaned|all.
     Output: structured text or JSON (--json flag).
 
-feedback-cli get <comment-id>
+consider-cli get <comment-id>
     Get a single comment with its full thread and context.
     Output: the comment body, all replies, file path, line info, and
     a snippet of the surrounding code for context.
 
-feedback-cli reply <comment-id> --message "..."
+consider-cli reply <comment-id> --message "..."
     Add a reply to a comment thread. Sets author to "agent".
 
-feedback-cli resolve <comment-id>
+consider-cli resolve <comment-id>
     Mark a comment as resolved.
 
-feedback-cli unresolve <comment-id>
+consider-cli unresolve <comment-id>
     Reopen a resolved comment.
 
-feedback-cli summary
+consider-cli summary
     High-level summary: N open comments across M files.
     Also reports workflow/anchor breakdown and unseen-open count.
     Useful for the agent to quickly check if there's pending feedback.
 
-feedback-cli context <comment-id>
+consider-cli context <comment-id>
     Output the comment along with the actual current file content
     around the anchor point (e.g., 10 lines before and after).
     This gives the agent the code context alongside the feedback.
@@ -381,19 +381,19 @@ Comments are created with `workflowState=open` the moment the developer creates 
 
 The developer controls when the agent sees the feedback by controlling when they tell the agent to look — either by prompting it directly in the main conversation, or by relying on the skill file's instructions for the agent to check periodically. This is simpler than a queue model and maps to how the developer already interacts with the agent.
 
-### 7.2 How the Agent Discovers Feedback
+### 7.2 How the Agent Discovers Comments
 
 The agent discovers feedback through the CLI, prompted by the skill file or by the developer.
 
-**Skill-prompted discovery:** The skill file instructs the agent to check for pending feedback at natural workflow transition points. For example: "Before beginning implementation of a plan, run `feedback-cli summary` to check if the developer has left inline feedback. If there are workflow-open comments, run `feedback-cli list` and address them before proceeding." This makes feedback checking part of the agent's habitual workflow without requiring the developer to remember to prompt it.
+**Skill-prompted discovery:** The skill file instructs the agent to check for pending feedback at natural workflow transition points. For example: "Before beginning implementation of a plan, run `consider-cli summary` to check if the developer has left inline feedback. If there are workflow-open comments, run `consider-cli list` and address them before proceeding." This makes feedback checking part of the agent's habitual workflow without requiring the developer to remember to prompt it.
 
-**Developer-prompted discovery:** The developer tells the agent in the main chat: "I've left inline feedback on the auth module — check `feedback-cli list --file src/auth/` and address it." This gives the developer explicit control and allows targeting by file or scope.
+**Developer-prompted discovery:** The developer tells the agent in the main chat: "I've left inline feedback on the auth module — check `consider-cli list --file src/auth/` and address it." This gives the developer explicit control and allows targeting by file or scope.
 
 **What we are NOT building for v1:** We are not building a mechanism for the extension to inject messages into the agent's chat session. This would require deep, agent-specific integration (hooking into Claude Code's VS Code extension API, writing to Codex/OpenCode stdin, etc.) and is fragile across agent versions. The skill-prompted and developer-prompted paths are reliable and sufficient.
 
 ### 7.3 Targeted Review via Skill Invocation
 
-The skill file should document how to filter feedback. When the developer says "check my feedback on @src/auth/login.ts" in the agent chat, the agent knows (from the skill) to run `feedback-cli list --file src/auth/login.ts`. The `@`-mention file reference syntax already exists in Claude Code and Codex, so this composes naturally with existing agent UX.
+The skill file should document how to filter feedback. When the developer says "check my feedback on @src/auth/login.ts" in the agent chat, the agent knows (from the skill) to run `consider-cli list --file src/auth/login.ts`. The `@`-mention file reference syntax already exists in Claude Code and Codex, so this composes naturally with existing agent UX.
 
 The skill file should also instruct the agent on how to handle both state axes: process `workflow=open` comments, and treat `anchor=stale`/`anchor=orphaned` as caution states (flag before acting on possibly outdated anchors).
 
@@ -448,40 +448,40 @@ The "Setup Agent Integration" command can write skill files into the project whe
 - What the feedback system is and why it exists.
 - The full CLI command reference with examples.
 - Conventions: when to reply in a thread vs. elevate to the main conversation, how to handle stale comments, when to resolve threads.
-- A note that the feedback store is at `.feedback/store.json` and can be read directly if needed, but the CLI is preferred.
+- A note that the feedback store is at `.consider/store.json` and can be read directly if needed, but the CLI is preferred.
 
 ### 8.2 Setup Command Behavior
 
-When the developer runs "Feedback: Setup Agent Integration":
+When the developer runs "Consider: Setup Agent Integration":
 
-1. Create `.feedback/` directory if it doesn't exist.
-2. Create `.feedback/bin/` and copy/generate the CLI tool files.
+1. Create `.consider/` directory if it doesn't exist.
+2. Create `.consider/bin/` and copy/generate the CLI tool files.
    - The extension package must carry these CLI/shared runtime artifacts so setup works the same from an installed VSIX as from a local development checkout.
-3. Write/update `.feedback/config.json` with tracked skill install locations (target, scope, absolute path) so uninstall can remove exactly what setup installed.
+3. Write/update `.consider/config.json` with tracked skill install locations (target, scope, absolute path) so uninstall can remove exactly what setup installed.
    - Repeated setup runs must merge this tracking idempotently.
 4. Show a single setup panel (extension-first onboarding) with explicit choices:
-   - whether to add `.feedback/` to `.gitignore` (recommended default: yes),
+   - whether to add `.consider/` to `.gitignore` (recommended default: yes),
    - which integrations to install (Claude/OpenCode/Codex),
    - one install location per selected integration (project-local or home-level).
    - allow leaving all integrations unchecked to skip skill installation for now.
-5. If `.gitignore` was selected, add `.feedback/` to `.gitignore` (append if `.gitignore` exists, create if not), avoiding duplicates.
+5. If `.gitignore` was selected, add `.consider/` to `.gitignore` (append if `.gitignore` exists, create if not), avoiding duplicates.
 6. Print a summary of what was set up.
 
-For v1, the feedback store location remains fixed at `<project-root>/.feedback/` and is not user-configurable. Skill install location is configurable per selected integration (project-local or home-level).
+For v1, the feedback store location remains fixed at `<project-root>/.consider/` and is not user-configurable. Skill install location is configurable per selected integration (project-local or home-level).
 
 ### 8.3 Uninstall / Offboarding
 
-When the developer runs "Feedback: Uninstall":
+When the developer runs "Consider: Uninstall":
 
 1. Present an explicit offboarding choice:
-   - full uninstall (remove `.feedback/`, tracked skills, optional `.gitignore` entry cleanup), or
-   - skills-only uninstall (keep `.feedback/` data).
-2. Read tracked skill installs from `.feedback/config.json`.
+   - full uninstall (remove `.consider/`, tracked skills, optional `.gitignore` entry cleanup), or
+   - skills-only uninstall (keep `.consider/` data).
+2. Read tracked skill installs from `.consider/config.json`.
 3. Remove tracked skill files/folders for the selected uninstall mode.
    - Limit deletion scope to the Consider skill package directory (`.../skills/consider`) rather than deleting agent root directories.
-   - If skills-only uninstall is selected, clear removed skill entries from `.feedback/config.json`.
+   - If skills-only uninstall is selected, clear removed skill entries from `.consider/config.json`.
 4. If no tracking data exists (older installs), fall back to discovering Consider skill files in known locations and remove those.
-5. Remove `.feedback/` when full uninstall is selected.
+5. Remove `.consider/` when full uninstall is selected.
 6. Print a summary of removed/skipped artifacts.
 
 ### 8.4 No MCP (For Now)
@@ -512,7 +512,7 @@ External changes (agent edits a file the developer has open) should also trigger
 
 Comments are anchored to a single file and line range for v1. Cross-file concerns ("this function in auth.ts doesn't match the interface in types.ts") should be handled in the main conversation.
 
-**v2 enhancement: labels.** A labeling system would allow the developer to tag related comments across files with a shared label (e.g., "error-handling-pattern"), enabling grouped filtering (`feedback-cli list --label error-handling-pattern`) and helping the agent see thematic connections across individual comments. The data model accommodates this (a `labels: string[]` field on comments) but the implementation is deferred to v2.
+**v2 enhancement: labels.** A labeling system would allow the developer to tag related comments across files with a shared label (e.g., "error-handling-pattern"), enabling grouped filtering (`consider-cli list --label error-handling-pattern`) and helping the agent see thematic connections across individual comments. The data model accommodates this (a `labels: string[]` field on comments) but the implementation is deferred to v2.
 
 ### 9.3 Concurrent Access
 
@@ -590,7 +590,7 @@ The recommended build order, with each step producing a usable increment:
 
 **Phase 1: Store format + CLI skeleton** — Define the JSON schema and build the CLI tool with basic operations: `list`, `get`, `reply`, `resolve`, `unresolve`, `summary`. No reconciliation yet — just reads/writes to the store with static line numbers. This is testable independently by hand-editing `store.json`.
 
-**Phase 2: Extension skeleton** — Get the VS Code Comments API wired up. The developer can add comments on lines, see them in the gutter, reply to them, and resolve them. Comments persist to `.feedback/store.json`. File watching picks up external changes to the store (agent replies). This is a usable local annotation tool.
+**Phase 2: Extension skeleton** — Get the VS Code Comments API wired up. The developer can add comments on lines, see them in the gutter, reply to them, and resolve them. Comments persist to `.consider/store.json`. File watching picks up external changes to the store (agent replies). This is a usable local annotation tool.
 
 **Phase 3: Content-based anchoring** — Implement the anchor data model, mtime-based change detection, and the re-anchoring algorithm. This logic must work in both the CLI (lazy on read) and the extension (on file open, external change, and active editing). Test with various edit patterns: insertions above a comment, deletions, function renames, file deletions. Implement staleness and orphan detection. This is the riskiest technical piece and should be tackled early.
 
@@ -600,7 +600,7 @@ The recommended build order, with each step producing a usable increment:
 
 **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) to validate command-level end-to-end behavior in fixture workspaces. Keep `npm test` as a fast PR gate, and require host integration tests in CI on each PR/push.
 
-**Phase 7: Onboarding and installation UX** — Replace implicit setup side effects with a guided setup flow in the extension. Keep `.feedback/` at project root for v1, make agent integration writes explicit opt-in, and improve first-run discoverability/documentation for end users.
+**Phase 7: Onboarding and installation UX** — Replace implicit setup side effects with a guided setup flow in the extension. Keep `.consider/` at project root for v1, make agent integration writes explicit opt-in, and improve first-run discoverability/documentation for end users.
 
 **Phase 8: Offboarding and uninstall UX** — Add a dedicated uninstall flow that can remove Consider runtime files and installed skills safely. Track install locations at setup time and use that tracking for deterministic cleanup.
 
@@ -616,10 +616,10 @@ The system is working when the following workflow is smooth and unbroken:
 
 1. Developer opens VS Code, reviews code the agent wrote.
 2. Developer clicks on lines, types comments. Each comment is immediately stored with `workflowState=open` and `anchorState=anchored`. Repeats across multiple files.
-3. Developer tells the agent (in their normal chat): "I've left inline feedback on the auth module, check it." Alternatively, the agent checks on its own because the skill file instructs it to run `feedback-cli summary` before starting work.
-4. Agent runs `feedback-cli list`, sees the comments with accurate line numbers (reconciled lazily by the CLI even if files changed since the comments were written).
-5. Agent runs `feedback-cli context <id>` for each, reads the feedback with surrounding code.
-6. Agent runs `feedback-cli reply <id> --message "..."` for each, responding to the feedback.
+3. Developer tells the agent (in their normal chat): "I've left inline feedback on the auth module, check it." Alternatively, the agent checks on its own because the skill file instructs it to run `consider-cli summary` before starting work.
+4. Agent runs `consider-cli list`, sees the comments with accurate line numbers (reconciled lazily by the CLI even if files changed since the comments were written).
+5. Agent runs `consider-cli context <id>` for each, reads the feedback with surrounding code.
+6. Agent runs `consider-cli reply <id> --message "..."` for each, responding to the feedback.
 7. Developer sees the agent's replies appear inline in VS Code, right next to their original comments.
 8. Developer resolves the ones they're satisfied with, continues the conversation on the ones they're not.
 9. Agent makes the agreed-upon code changes.

@@ -10,7 +10,7 @@ const { archiveResolvedComments } = require(path.join(ROOT, 'extension', 'out', 
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-archive-test-'));
-  fs.mkdirSync(path.join(dir, '.feedback'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.consider'), { recursive: true });
   return dir;
 }
 
@@ -56,7 +56,7 @@ describe('archive resolved comments', () => {
     cleanup(projectRoot);
   });
 
-  it('moves resolved comments into .feedback/archive.json and removes them from active store', () => {
+  it('moves resolved comments into .consider/archive.json and removes them from active store', () => {
     const store = makeStore([
       makeComment('c_open', 'open'),
       makeComment('c_resolved_1', 'resolved'),
@@ -70,7 +70,7 @@ describe('archive resolved comments', () => {
     assert.equal(store.comments.length, 1);
     assert.equal(store.comments[0].id, 'c_open');
 
-    const archivePath = path.join(projectRoot, '.feedback', 'archive.json');
+    const archivePath = path.join(projectRoot, '.consider', 'archive.json');
     assert.ok(fs.existsSync(archivePath));
     const archive = JSON.parse(fs.readFileSync(archivePath, 'utf-8'));
     assert.equal(archive.version, 1);
@@ -90,7 +90,7 @@ describe('archive resolved comments', () => {
     assert.equal(result.archivedCount, 0);
     assert.equal(result.remainingCount, 2);
     assert.equal(store.comments.length, 2);
-    assert.ok(!fs.existsSync(path.join(projectRoot, '.feedback', 'archive.json')));
+    assert.ok(!fs.existsSync(path.join(projectRoot, '.consider', 'archive.json')));
   });
 
   it('appends to an existing archive across multiple runs', () => {
@@ -108,7 +108,7 @@ describe('archive resolved comments', () => {
 
     assert.equal(secondResult.archivedCount, 2);
     const archive = JSON.parse(
-      fs.readFileSync(path.join(projectRoot, '.feedback', 'archive.json'), 'utf-8')
+      fs.readFileSync(path.join(projectRoot, '.consider', 'archive.json'), 'utf-8')
     );
     assert.equal(archive.comments.length, 3);
     assert.equal(

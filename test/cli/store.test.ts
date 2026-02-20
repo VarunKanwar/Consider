@@ -9,7 +9,7 @@ const store = require(path.join(ROOT, 'shared', 'store.js'));
 
 function makeTmpDir() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-test-'));
-  fs.mkdirSync(path.join(dir, '.feedback'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.consider'), { recursive: true });
   return dir;
 }
 
@@ -53,18 +53,18 @@ describe('store', () => {
     assert.equal(loaded.comments[0].body, 'Test comment');
   });
 
-  it('writeStore creates .feedback directory if needed', () => {
+  it('writeStore creates .consider directory if needed', () => {
     const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-test-'));
-    // No .feedback dir yet
+    // No .consider dir yet
     const data = store.emptyStore();
     store.writeStore(dir2, data);
-    assert.ok(fs.existsSync(path.join(dir2, '.feedback', 'store.json')));
+    assert.ok(fs.existsSync(path.join(dir2, '.consider', 'store.json')));
     cleanup(dir2);
   });
 
   it('atomic write does not leave tmp file', () => {
     store.writeStore(tmpDir, store.emptyStore());
-    const files = fs.readdirSync(path.join(tmpDir, '.feedback'));
+    const files = fs.readdirSync(path.join(tmpDir, '.consider'));
     assert.ok(!files.some(file => file.startsWith('store.json.tmp.')));
     assert.ok(!files.includes('store.json.lock'));
   });
@@ -150,7 +150,7 @@ describe('store', () => {
   });
 
   it('readStore migrates legacy status values to workflow/anchor states', () => {
-    const storePath = path.join(tmpDir, '.feedback', 'store.json');
+    const storePath = path.join(tmpDir, '.consider', 'store.json');
     fs.writeFileSync(
       storePath,
       JSON.stringify(
@@ -203,7 +203,7 @@ describe('store', () => {
     assert.equal(store.findComment(data, 'c_found').body, 'here');
   });
 
-  it('findProjectRoot walks up to find .feedback', () => {
+  it('findProjectRoot walks up to find .consider', () => {
     const subdir = path.join(tmpDir, 'a', 'b', 'c');
     fs.mkdirSync(subdir, { recursive: true });
     const found = store.findProjectRoot(subdir);

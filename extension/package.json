@@ -21,6 +21,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
+    "workspaceContains:.consider/store.json",
     "workspaceContains:.feedback/store.json",
     "onCommand:consider.addComment",
     "onCommand:consider.setupAgentIntegration",
@@ -54,23 +55,23 @@
       },
       {
         "command": "consider.setupAgentIntegration",
-        "title": "Feedback: Setup Agent Integration"
+        "title": "Consider: Setup Agent Integration"
       },
       {
         "command": "consider.uninstallAgentIntegration",
-        "title": "Feedback: Uninstall"
+        "title": "Consider: Uninstall"
       },
       {
         "command": "consider.showAllComments",
-        "title": "Feedback: Show All Comments"
+        "title": "Consider: Show All Comments"
       },
       {
         "command": "consider.archiveResolved",
-        "title": "Feedback: Archive Resolved"
+        "title": "Consider: Archive Resolved"
       },
       {
         "command": "consider.reconcileAll",
-        "title": "Feedback: Reconcile All"
+        "title": "Consider: Reconcile All"
       },
       {
         "command": "consider.toggleCommentThreadFromTree",
@@ -82,7 +83,7 @@
       "explorer": [
         {
           "id": "consider.comments",
-          "name": "Feedback Comments"
+          "name": "Consider Comments"
         }
       ]
     },
@@ -91,12 +92,12 @@
         {
           "command": "consider.resolveThread",
           "group": "navigation",
-          "when": "commentController == consider && commentThread =~ /^feedback-thread-open-/"
+          "when": "commentController == consider && commentThread =~ /^consider-thread-open-/"
         },
         {
           "command": "consider.unresolveThread",
           "group": "navigation",
-          "when": "commentController == consider && commentThread =~ /^feedback-thread-resolved-/"
+          "when": "commentController == consider && commentThread =~ /^consider-thread-resolved-/"
         }
       ],
       "comments/commentThread/context": [
@@ -108,17 +109,17 @@
         {
           "command": "consider.replyToComment",
           "group": "inline",
-          "when": "commentController == consider && !commentThreadIsEmpty && commentThread =~ /^feedback-thread-open-/"
+          "when": "commentController == consider && !commentThreadIsEmpty && commentThread =~ /^consider-thread-open-/"
         },
         {
           "command": "consider.resolveThread",
           "group": "navigation",
-          "when": "commentController == consider && commentThread =~ /^feedback-thread-open-/"
+          "when": "commentController == consider && commentThread =~ /^consider-thread-open-/"
         },
         {
           "command": "consider.unresolveThread",
           "group": "navigation",
-          "when": "commentController == consider && commentThread =~ /^feedback-thread-resolved-/"
+          "when": "commentController == consider && commentThread =~ /^consider-thread-resolved-/"
         }
       ],
       "comments/comment/title": [
@@ -132,7 +133,7 @@
         {
           "command": "consider.toggleCommentThreadFromTree",
           "group": "inline",
-          "when": "view == consider.comments && viewItem =~ /feedback-comment-/"
+          "when": "view == consider.comments && viewItem =~ /consider-comment-/"
         }
       ]
     }

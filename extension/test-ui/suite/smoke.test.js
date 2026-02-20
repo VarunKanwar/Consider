@@ -21,11 +21,11 @@ const RETRY_ATTEMPTS = IS_CI ? 2 : 1;
 const EXTERNAL_WRITE_SETTLE_MS = IS_CI ? 1200 : 700;
 
 function storePath(workspacePath) {
-  return path.join(workspacePath, '.feedback', 'store.json');
+  return path.join(workspacePath, '.consider', 'store.json');
 }
 
 function archivePath(workspacePath) {
-  return path.join(workspacePath, '.feedback', 'archive.json');
+  return path.join(workspacePath, '.consider', 'archive.json');
 }
 
 function loadStore(workspacePath) {
@@ -40,7 +40,7 @@ function removeIfExists(targetPath) {
 }
 
 function resetWorkspace(workspacePath) {
-  removeIfExists(path.join(workspacePath, '.feedback'));
+  removeIfExists(path.join(workspacePath, '.consider'));
   removeIfExists(path.join(workspacePath, '.gitignore'));
   removeIfExists(path.join(workspacePath, '.claude'));
   removeIfExists(path.join(workspacePath, '.opencode'));
@@ -60,7 +60,7 @@ function resetWorkspace(workspacePath) {
 }
 
 function runCli(workspacePath, repoRoot, args) {
-  const cliPath = path.join(repoRoot, 'cli', 'feedback-cli.js');
+  const cliPath = path.join(repoRoot, 'cli', 'consider-cli.js');
   const result = cp.spawnSync(process.execPath, [cliPath, ...args], {
     cwd: workspacePath,
     encoding: 'utf-8',
@@ -171,12 +171,12 @@ async function setupViaWebview() {
   const editorView = new EditorView();
   await withRetry('open setup webview', RETRY_ATTEMPTS, async () => {
     await dismissSetupPromptIfPresent();
-    await workbench.executeCommand('Feedback: Setup Agent Integration');
+    await workbench.executeCommand('Consider: Setup Agent Integration');
 
     let setupTitle;
     await waitFor(async () => {
       const titles = await editorView.getOpenEditorTitles();
-      setupTitle = titles.find((title) => title.includes('Feedback: Setup'));
+      setupTitle = titles.find((title) => title.includes('Consider: Setup'));
       return typeof setupTitle === 'string';
     }, 'setup webview tab');
     await editorView.openEditor(setupTitle);
@@ -210,7 +210,7 @@ async function addCommentViaCommand(commentBody) {
 
 async function uninstallFullViaCommand() {
   const workbench = new Workbench();
-  await workbench.executeCommand('Feedback: Uninstall');
+  await workbench.executeCommand('Consider: Uninstall');
   await withRetry('select uninstall quick pick', RETRY_ATTEMPTS, async () => {
     const options = await InputBox.create(INPUT_TIMEOUT_MS);
     await options.selectQuickPick('Full uninstall');
@@ -254,17 +254,17 @@ describe('Consider UI smoke', function () {
     await waitFor(
       () =>
         fs.existsSync(storePath(workspacePath)) &&
-        fs.existsSync(path.join(workspacePath, '.feedback', 'config.json')),
+        fs.existsSync(path.join(workspacePath, '.consider', 'config.json')),
       'setup-created store and config files'
     );
 
-    assert.ok(fs.existsSync(path.join(workspacePath, '.feedback', 'config.json')));
-    assert.ok(fs.existsSync(path.join(workspacePath, '.feedback', 'bin', 'feedback-cli')));
-    assert.ok(fs.existsSync(path.join(workspacePath, '.feedback', 'bin', 'feedback-cli.cjs')));
-    assert.ok(fs.existsSync(path.join(workspacePath, '.feedback', 'shared', 'store.js')));
+    assert.ok(fs.existsSync(path.join(workspacePath, '.consider', 'config.json')));
+    assert.ok(fs.existsSync(path.join(workspacePath, '.consider', 'bin', 'consider-cli')));
+    assert.ok(fs.existsSync(path.join(workspacePath, '.consider', 'bin', 'consider-cli.cjs')));
+    assert.ok(fs.existsSync(path.join(workspacePath, '.consider', 'shared', 'store.js')));
 
     const gitignore = fs.readFileSync(path.join(workspacePath, '.gitignore'), 'utf-8');
-    assert.ok(gitignore.includes('.feedback/'));
+    assert.ok(gitignore.includes('.consider/'));
   });
 
   it('covers add-comment, CLI reply watcher, resolve/unresolve, and archive', async function () {
@@ -340,7 +340,7 @@ describe('Consider UI smoke', function () {
     }, 'resolved workflow state before archive');
 
     const workbench = new Workbench();
-    await workbench.executeCommand('Feedback: Archive Resolved');
+    await workbench.executeCommand('Consider: Archive Resolved');
     await waitFor(
       () => fs.existsSync(archivePath(workspacePath)),
       'archive file creation after archive command'
@@ -363,15 +363,15 @@ describe('Consider UI smoke', function () {
     await uninstallFullViaCommand();
 
     await waitFor(
-      () => !fs.existsSync(path.join(workspacePath, '.feedback')),
-      'feedback directory removal after full uninstall'
+      () => !fs.existsSync(path.join(workspacePath, '.consider')),
+      'consider directory removal after full uninstall'
     );
 
     const gitignorePath = path.join(workspacePath, '.gitignore');
     if (fs.existsSync(gitignorePath)) {
       const gitignore = fs.readFileSync(gitignorePath, 'utf-8');
-      assert.ok(!gitignore.includes('.feedback/'));
-      assert.ok(!gitignore.includes('.feedback\n'));
+      assert.ok(!gitignore.includes('.consider/'));
+      assert.ok(!gitignore.includes('.consider\n'));
     }
   });
 });

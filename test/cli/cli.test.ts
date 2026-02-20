@@ -7,11 +7,11 @@ const os = require('os');
 const { execFileSync, spawn } = require('child_process');
 
 const ROOT = process.cwd();
-const CLI_PATH = path.join(ROOT, 'cli', 'feedback-cli.js');
+const CLI_PATH = path.join(ROOT, 'cli', 'consider-cli.js');
 
 function makeTmpProject() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-cli-test-'));
-  fs.mkdirSync(path.join(dir, '.feedback'), { recursive: true });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'consider-cli-test-'));
+  fs.mkdirSync(path.join(dir, '.consider'), { recursive: true });
   // Create a sample source file for context tests
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'src', 'main.ts'), [
@@ -36,12 +36,12 @@ function cleanup(dir) {
 }
 
 function seedStore(dir, comments) {
-  const storePath = path.join(dir, '.feedback', 'store.json');
+  const storePath = path.join(dir, '.consider', 'store.json');
   fs.writeFileSync(storePath, JSON.stringify({ version: 1, comments }, null, 2));
 }
 
 function readStoreFile(dir) {
-  const raw = fs.readFileSync(path.join(dir, '.feedback', 'store.json'), 'utf-8');
+  const raw = fs.readFileSync(path.join(dir, '.consider', 'store.json'), 'utf-8');
   return JSON.parse(raw);
 }
 
@@ -163,7 +163,7 @@ describe('cli', () => {
   describe('help', () => {
     it('shows help with --help', () => {
       const out = run(['--help'], tmpDir);
-      assert.ok(out.includes('feedback-cli'));
+      assert.ok(out.includes('consider-cli'));
       assert.ok(out.includes('list'));
       assert.ok(out.includes('reply'));
     });
@@ -385,7 +385,7 @@ describe('cli', () => {
     it('handles empty store', () => {
       seedStore(tmpDir, []);
       const out = run(['summary'], tmpDir);
-      assert.ok(out.includes('No feedback'));
+      assert.ok(out.includes('No comments.'));
     });
   });
 
@@ -436,7 +436,7 @@ describe('cli', () => {
   describe('empty store', () => {
     it('list works with no store file', () => {
       const dir2 = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-empty-'));
-      fs.mkdirSync(path.join(dir2, '.feedback'));
+      fs.mkdirSync(path.join(dir2, '.consider'));
       const out = run(['list'], dir2);
       assert.ok(out.includes('No'));
       cleanup(dir2);

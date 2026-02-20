@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { emptyStore, storePath, writeStore } from './store';
+import { emptyStore, storePath, storeDirectoryPath, writeStore } from './store';
 
 const CLAUDE_SKILL_PATH = ['.claude', 'skills', 'consider', 'SKILL.md'];
 const OPENCODE_SKILL_PATH = ['.opencode', 'skills', 'consider', 'SKILL.md'];
@@ -9,14 +9,16 @@ const CODEX_SKILL_PATH = ['.codex', 'skills', 'consider', 'SKILL.md'];
 const CODEX_LEGACY_SKILL_PATH = ['.agents', 'skills', 'consider', 'SKILL.md'];
 const SKILL_NAME = 'consider';
 const SETUP_CONFIG_VERSION = 1;
+const CONSIDER_DIR_NAME = '.consider';
+const LEGACY_FEEDBACK_DIR_NAME = '.feedback';
 
 const SKILL_DESCRIPTIONS: Record<SetupIntegrationTarget, string> = {
   claude:
-    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the Consider CLI.',
   opencode:
-    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the Consider CLI.',
   codex:
-    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the feedback CLI.',
+    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the Consider CLI.',
 };
 
 export interface AgentDetection {
@@ -57,7 +59,8 @@ export interface SetupTrackedSkillInstall extends SetupIntegrationInstall {
 }
 
 export interface SetupResult {
-  feedbackDirCreated: boolean;
+  considerDirCreated: boolean;
+  legacyDirMigrated: boolean;
   binDirCreated: boolean;
   storeCreated: boolean;
   cliCopied: string[];
@@ -71,7 +74,7 @@ export interface SetupResult {
 }
 
 export interface UninstallOptions {
-  removeFeedbackDir?: boolean;
+  removeConsiderDir?: boolean;
   removeGitignoreEntry?: boolean;
   homeDir?: string;
 }
@@ -82,8 +85,9 @@ export interface UninstallResult {
   trackedSkillInstalls: SetupTrackedSkillInstall[];
   skillsRemoved: string[];
   skillsMissing: string[];
-  feedbackDirRemoved: boolean;
-  feedbackDirAbsent: boolean;
+  considerDirRemoved: boolean;
+  considerDirAbsent: boolean;
+  legacyFeedbackDirRemoved: boolean;
   gitignoreUpdated: boolean;
   gitignoreSkipped: boolean;
 }
@@ -110,8 +114,36 @@ function trimTrailingBlankLines(content: string): string {
   return content.replace(/\n+$/g, '');
 }
 
+function considerDirPath(projectRoot: string): string {
+  return path.join(projectRoot, CONSIDER_DIR_NAME);
+}
+
+function legacyFeedbackDirPath(projectRoot: string): string {
+  return path.join(projectRoot, LEGACY_FEEDBACK_DIR_NAME);
+}
+
 function configPath(projectRoot: string): string {
-  return path.join(projectRoot, '.feedback', 'config.json');
+  const considerConfigPath = path.join(considerDirPath(projectRoot), 'config.json');
+  if (fs.existsSync(considerConfigPath)) {
+    return considerConfigPath;
+  }
+
+  const legacyConfigPath = path.join(legacyFeedbackDirPath(projectRoot), 'config.json');
+  if (fs.existsSync(legacyConfigPath)) {
+    return legacyConfigPath;
+  }
+
+  return path.join(storeDirectoryPath(projectRoot), 'config.json');
+}
+
+function migrateLegacyFeedbackDirectory(projectRoot: string): boolean {
+  const considerDir = considerDirPath(projectRoot);
+  const legacyDir = legacyFeedbackDirPath(projectRoot);
+  if (fs.existsSync(considerDir) || !fs.existsSync(legacyDir)) {
+    return false;
+  }
+  fs.renameSync(legacyDir, considerDir);
+  return true;
 }
 
 function emptySetupConfig(): SetupConfigFile {
@@ -217,18 +249,27 @@ function ensureGitignoreEntry(projectRoot: string): boolean {
     : '';
 
   const lines = existing.length > 0 ? existing.split('\n') : [];
-  const alreadyPresent = lines.some((line) => {
+  const hasConsiderEntry = lines.some((line) => {
     const trimmed = line.trim();
-    return trimmed === '.feedback/' || trimmed === '.feedback';
+    return trimmed === '.consider/' || trimmed === '.consider';
   });
 
-  if (alreadyPresent) {
+  const withoutLegacyEntries = lines.filter((line) => {
+    const trimmed = line.trim();
+    return trimmed !== '.feedback/' && trimmed !== '.feedback';
+  });
+  const needsLegacyCleanup = withoutLegacyEntries.length !== lines.length;
+
+  if (hasConsiderEntry && !needsLegacyCleanup) {
     return false;
   }
 
-  const next = trimTrailingBlankLines(existing);
+  const nextLines = hasConsiderEntry
+    ? withoutLegacyEntries
+    : [...withoutLegacyEntries, '.consider/'];
+  const next = trimTrailingBlankLines(nextLines.join('\n'));
   const separator = next.length > 0 ? '\n' : '';
-  fs.writeFileSync(gitignorePath, `${next}${separator}.feedback/\n`, 'utf-8');
+  fs.writeFileSync(gitignorePath, `${next}${separator}`, 'utf-8');
   return true;
 }
 
@@ -242,7 +283,10 @@ function removeGitignoreEntry(projectRoot: string): boolean {
   const lines = existing.length > 0 ? existing.split('\n') : [];
   const filtered = lines.filter((line) => {
     const trimmed = line.trim();
-    return trimmed !== '.feedback/' && trimmed !== '.feedback';
+    return trimmed !== '.consider/' &&
+      trimmed !== '.consider' &&
+      trimmed !== '.feedback/' &&
+      trimmed !== '.feedback';
   });
 
   if (filtered.length === lines.length) {
@@ -359,7 +403,7 @@ function knownSkillInstallCandidates(
   ];
 }
 
-function looksLikeFeedbackLoopSkill(skillPath: string): boolean {
+function looksLikeConsiderSkill(skillPath: string): boolean {
   if (!fs.existsSync(skillPath)) {
     return false;
   }
@@ -377,7 +421,7 @@ function detectInstalledSkillsFallback(
 ): SetupTrackedSkillInstall[] {
   const detected: SetupTrackedSkillInstall[] = [];
   for (const install of knownSkillInstallCandidates(projectRoot, homeDir)) {
-    if (looksLikeFeedbackLoopSkill(install.path)) {
+    if (looksLikeConsiderSkill(install.path)) {
       detected.push(install);
     }
   }
@@ -397,21 +441,21 @@ function buildSkillMarkdown(target: SetupIntegrationTarget): string {
 # Consider
 
 You are configured with Consider inline review comments for this repository.
-Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedback.
+Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedback.
 
 ## Workflow
 
 1. Before starting implementation, run:
-   - \`.feedback/bin/feedback-cli summary\`
+   - \`.consider/bin/consider-cli summary\`
 2. If open comments exist, inspect them:
-   - \`.feedback/bin/feedback-cli list\`
-   - \`.feedback/bin/feedback-cli context <comment-id>\`
+   - \`.consider/bin/consider-cli list\`
+   - \`.consider/bin/consider-cli context <comment-id>\`
 3. Reply directly in the thread:
-   - \`.feedback/bin/feedback-cli reply <comment-id> --message "..." \`
+   - \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
 4. Resolve only after the requested action is complete (or the developer confirms no change is needed):
-   - \`.feedback/bin/feedback-cli resolve <comment-id>\`
+   - \`.consider/bin/consider-cli resolve <comment-id>\`
 5. Reopen if follow-up work remains:
-   - \`.feedback/bin/feedback-cli unresolve <comment-id>\`
+   - \`.consider/bin/consider-cli unresolve <comment-id>\`
 
 ## Conventions
 
@@ -425,17 +469,17 @@ Use the CLI in \`.feedback/bin/feedback-cli\` to read and reply to located feedb
   - Use the main chat for cross-cutting decisions, tradeoffs, or direction changes.
 - Avoid duplicating full responses in both places; if escalating to main chat, leave a short thread pointer.
 - If a comment is informational or preference-only, prefer a brief in-thread acknowledgement and no code edits.
-- The source-of-truth store is \`.feedback/store.json\`; use the CLI unless debugging.
+- The source-of-truth store is \`.consider/store.json\`; use the CLI unless debugging.
 
 ## Commands
 
-- \`.feedback/bin/feedback-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]\`
-- \`.feedback/bin/feedback-cli get <comment-id> [--json]\`
-- \`.feedback/bin/feedback-cli context <comment-id> [--lines N] [--json]\`
-- \`.feedback/bin/feedback-cli reply <comment-id> --message "..." \`
-- \`.feedback/bin/feedback-cli resolve <comment-id>\`
-- \`.feedback/bin/feedback-cli unresolve <comment-id>\`
-- \`.feedback/bin/feedback-cli summary [--json]\`
+- \`.consider/bin/consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]\`
+- \`.consider/bin/consider-cli get <comment-id> [--json]\`
+- \`.consider/bin/consider-cli context <comment-id> [--lines N] [--json]\`
+- \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
+- \`.consider/bin/consider-cli resolve <comment-id>\`
+- \`.consider/bin/consider-cli unresolve <comment-id>\`
+- \`.consider/bin/consider-cli summary [--json]\`
 `;
 }
 
@@ -452,10 +496,10 @@ function writeSkillFile(
 
 function copyCli(
   cliSourceDir: string,
-  destinationFeedbackDir: string,
+  destinationConsiderDir: string,
   destinationBinDir: string
 ): string[] {
-  const files = ['feedback-cli', 'feedback-cli.js'];
+  const files = ['consider-cli', 'consider-cli.js'];
   const copied: string[] = [];
 
   for (const file of files) {
@@ -470,14 +514,14 @@ function copyCli(
 
   // Always ship a .cjs runtime entrypoint so the CLI works in repos with
   // package.json type=module.
-  const cjsDestination = path.join(destinationBinDir, 'feedback-cli.cjs');
-  fs.copyFileSync(path.join(destinationBinDir, 'feedback-cli.js'), cjsDestination);
+  const cjsDestination = path.join(destinationBinDir, 'consider-cli.cjs');
+  fs.copyFileSync(path.join(destinationBinDir, 'consider-cli.js'), cjsDestination);
   copied.push(cjsDestination);
 
-  const launcherPath = path.join(destinationBinDir, 'feedback-cli');
+  const launcherPath = path.join(destinationBinDir, 'consider-cli');
   fs.writeFileSync(
     launcherPath,
-    '#!/bin/sh\nexec node "$(dirname "$0")/feedback-cli.cjs" "$@"\n',
+    '#!/bin/sh\nexec node "$(dirname "$0")/consider-cli.cjs" "$@"\n',
     'utf-8'
   );
   const binPackageJsonPath = path.join(destinationBinDir, 'package.json');
@@ -488,9 +532,9 @@ function copyCli(
   );
   copied.push(binPackageJsonPath);
 
-  // The CLI depends on shared runtime modules relative to .feedback/bin.
+  // The CLI depends on shared runtime modules relative to .consider/bin.
   const sharedSourceDir = path.resolve(cliSourceDir, '..', 'shared');
-  const sharedDestinationDir = path.join(destinationFeedbackDir, 'shared');
+  const sharedDestinationDir = path.join(destinationConsiderDir, 'shared');
   fs.mkdirSync(sharedDestinationDir, { recursive: true });
   for (const file of ['store.js', 'reconcile.js']) {
     const source = path.join(sharedSourceDir, file);
@@ -576,9 +620,10 @@ export function runSetupAgentIntegration(
   projectRoot: string,
   options: SetupOptions
 ): SetupResult {
-  const feedbackDir = path.join(projectRoot, '.feedback');
-  const feedbackDirCreated = ensureDirectory(feedbackDir);
-  const binDir = path.join(feedbackDir, 'bin');
+  const legacyDirMigrated = migrateLegacyFeedbackDirectory(projectRoot);
+  const considerDir = considerDirPath(projectRoot);
+  const considerDirCreated = ensureDirectory(considerDir);
+  const binDir = path.join(considerDir, 'bin');
   const binDirCreated = ensureDirectory(binDir);
 
   const sp = storePath(projectRoot);
@@ -587,7 +632,7 @@ export function runSetupAgentIntegration(
     writeStore(projectRoot, emptyStore());
   }
 
-  const cliCopied = copyCli(options.cliSourceDir, feedbackDir, binDir);
+  const cliCopied = copyCli(options.cliSourceDir, considerDir, binDir);
   const addGitignoreEntry = options.addGitignoreEntry ?? true;
   const gitignoreUpdated = addGitignoreEntry
     ? ensureGitignoreEntry(projectRoot)
@@ -655,7 +700,8 @@ export function runSetupAgentIntegration(
   });
 
   return {
-    feedbackDirCreated,
+    considerDirCreated,
+    legacyDirMigrated,
     binDirCreated,
     storeCreated,
     cliCopied,
@@ -674,11 +720,13 @@ export function runUninstallAgentIntegration(
   options: UninstallOptions = {}
 ): UninstallResult {
   const homeDir = options.homeDir ?? os.homedir();
-  const removeFeedbackDir = options.removeFeedbackDir ?? true;
+  const removeConsiderDir = options.removeConsiderDir ?? true;
   const shouldRemoveGitignoreEntry = options.removeGitignoreEntry ?? true;
 
-  const feedbackDir = path.join(projectRoot, '.feedback');
-  const feedbackDirExists = fs.existsSync(feedbackDir);
+  const considerDir = considerDirPath(projectRoot);
+  const considerDirExists = fs.existsSync(considerDir);
+  const legacyFeedbackDir = legacyFeedbackDirPath(projectRoot);
+  const legacyFeedbackDirExists = fs.existsSync(legacyFeedbackDir);
   const configFilePath = configPath(projectRoot);
   const configFound = fs.existsSync(configFilePath);
 
@@ -707,14 +755,20 @@ export function runUninstallAgentIntegration(
     : false;
   const gitignoreSkipped = !shouldRemoveGitignoreEntry;
 
-  let feedbackDirRemoved = false;
-  const feedbackDirAbsent = !feedbackDirExists;
-  if (removeFeedbackDir && feedbackDirExists) {
-    fs.rmSync(feedbackDir, { recursive: true, force: true });
-    feedbackDirRemoved = true;
+  let considerDirRemoved = false;
+  const considerDirAbsent = !considerDirExists;
+  if (removeConsiderDir && considerDirExists) {
+    fs.rmSync(considerDir, { recursive: true, force: true });
+    considerDirRemoved = true;
   }
 
-  if (!removeFeedbackDir && configFound) {
+  let legacyFeedbackDirRemoved = false;
+  if (removeConsiderDir && legacyFeedbackDirExists) {
+    fs.rmSync(legacyFeedbackDir, { recursive: true, force: true });
+    legacyFeedbackDirRemoved = true;
+  }
+
+  if (!removeConsiderDir && configFound) {
     const removedPaths = new Set(
       trackedSkillInstalls.map((install) => path.normalize(install.path))
     );
@@ -734,8 +788,9 @@ export function runUninstallAgentIntegration(
     trackedSkillInstalls,
     skillsRemoved,
     skillsMissing,
-    feedbackDirRemoved,
-    feedbackDirAbsent,
+    considerDirRemoved,
+    considerDirAbsent,
+    legacyFeedbackDirRemoved,
     gitignoreUpdated,
     gitignoreSkipped,
   };

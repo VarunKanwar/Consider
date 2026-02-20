@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import {
   readStore,
+  storePath,
   writeStore,
   generateCommentId,
   generateReplyId,
@@ -123,7 +124,7 @@ function statusTagText(comment: FeedbackComment): string {
 }
 
 function threadContextValue(comment: FeedbackComment): string {
-  return `feedback-thread-${comment.workflowState}-${comment.anchorState}`;
+  return `consider-thread-${comment.workflowState}-${comment.anchorState}`;
 }
 
 class FeedbackCommentsTreeProvider
@@ -175,7 +176,7 @@ class FeedbackCommentsTreeProvider
       item.description = `${element.comments.length} comment${
         element.comments.length === 1 ? '' : 's'
       }`;
-      item.tooltip = `${element.file}\n${element.comments.length} feedback comment${
+      item.tooltip = `${element.file}\n${element.comments.length} comment${
         element.comments.length === 1 ? '' : 's'
       }`;
       item.iconPath = new vscode.ThemeIcon('file-code');
@@ -204,10 +205,10 @@ class FeedbackCommentsTreeProvider
           : new vscode.ThemeIcon('comment');
     item.command = {
       command: 'consider.openCommentFromTree',
-      title: 'Open Feedback Comment',
+      title: 'Open Consider Comment',
       arguments: [comment.id],
     };
-    item.contextValue = `feedback-comment-${status}`;
+    item.contextValue = `consider-comment-${status}`;
     return item;
   }
 
@@ -245,7 +246,7 @@ class FeedbackCommentsTreeProvider
         const commentNode = {
           kind: 'comment',
           comment,
-          nodeId: `feedback-comment-node-${comment.id}-${++this.nodeSequence}`,
+          nodeId: `consider-comment-node-${comment.id}-${++this.nodeSequence}`,
         } satisfies FeedbackCommentNode;
         this.commentNodesById.set(comment.id, commentNode);
       }
@@ -257,10 +258,10 @@ class FeedbackCommentsTreeProvider
  * Main extension controller. Manages the CommentController, store sync,
  * and file watching.
  */
-class FeedbackLoopController {
+class ConsiderController {
   private commentController: vscode.CommentController;
   private projectRoot: string;
-  private storeWatcher: vscode.FileSystemWatcher | undefined;
+  private storeWatchers: vscode.FileSystemWatcher[] = [];
   private disposables: vscode.Disposable[] = [];
   /**
    * Map of comment ID -> CommentThread for quick lookup.
@@ -479,12 +480,12 @@ class FeedbackLoopController {
   private async handleAddCommentFromCommandPalette(): Promise<void> {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showWarningMessage('Open a file before adding feedback.');
+      vscode.window.showWarningMessage('Open a file before adding a Consider comment.');
       return;
     }
     if (editor.document.uri.scheme !== 'file') {
       vscode.window.showWarningMessage(
-        'Feedback comments can only be added to files on disk.'
+        'Consider comments can only be added to files on disk.'
       );
       return;
     }
@@ -501,7 +502,7 @@ class FeedbackLoopController {
       placeHolder: '',
       ignoreFocusOut: true,
       validateInput: (value) => {
-        return value.trim().length === 0 ? 'Feedback cannot be empty.' : null;
+        return value.trim().length === 0 ? 'Comment cannot be empty.' : null;
       },
     });
     if (!body || body.trim().length === 0) {
@@ -598,7 +599,7 @@ class FeedbackLoopController {
     const thread = reply.thread;
     const commentId = this.getCommentIdFromThread(thread);
     if (!commentId) {
-      vscode.window.showErrorMessage('Could not find the feedback comment for this thread.');
+      vscode.window.showErrorMessage('Could not find the consider comment for this thread.');
       return;
     }
 
@@ -698,7 +699,7 @@ class FeedbackLoopController {
 
   private async maybePromptForSetup(): Promise<void> {
     const promptStateKey = 'consider.setupPromptShown';
-    const storeExists = fs.existsSync(path.join(this.projectRoot, '.feedback', 'store.json'));
+    const storeExists = fs.existsSync(storePath(this.projectRoot));
     if (storeExists) {
       return;
     }
@@ -709,7 +710,7 @@ class FeedbackLoopController {
     await this.context.workspaceState.update(promptStateKey, true);
 
     const selected = await vscode.window.showInformationMessage(
-      'Consider is installed for this workspace. Run setup to initialize .feedback and optional agent integrations.',
+      'Consider is installed for this workspace. Run setup to initialize .consider and optional agent integrations.',
       'Set Up Now',
       'Later'
     );
@@ -911,12 +912,12 @@ class FeedbackLoopController {
   </style>
 </head>
 <body>
-  <h1>Feedback Setup</h1>
+  <h1>Consider Setup</h1>
   <p>Configure workspace files and optional agent skills in one step.</p>
   <div class="section-title">Project Settings</div>
   <label class="setting">
     <input type="checkbox" id="gitignore" checked />
-    <span>Add <code>.feedback/</code> to <code>.gitignore</code></span>
+    <span>Add <code>.consider/</code> to <code>.gitignore</code></span>
   </label>
   <div class="section-title">Agent Skills</div>
   <p>Select agents to install and set each scope with the switch (Workspace or Home).</p>
@@ -1015,8 +1016,8 @@ class FeedbackLoopController {
       { addGitignoreEntry: boolean; integrationInstalls: SetupIntegrationInstall[] } | undefined
     >((resolve) => {
       const panel = vscode.window.createWebviewPanel(
-        'feedbackLoop.setupIntegrations',
-        'Feedback: Setup',
+        'consider.setupIntegrations',
+        'Consider: Setup',
         vscode.ViewColumn.Active,
         {
           enableScripts: true,
@@ -1100,8 +1101,11 @@ class FeedbackLoopController {
       });
 
       const summary: string[] = [];
-      summary.push('.feedback scaffolding ready');
-      summary.push('CLI deployed to .feedback/bin');
+      summary.push('.consider scaffolding ready');
+      if (result.legacyDirMigrated) {
+        summary.push('migrated legacy .feedback');
+      }
+      summary.push('CLI deployed to .consider/bin');
       if (result.gitignoreSkipped) {
         summary.push('.gitignore unchanged');
       } else if (result.gitignoreUpdated) {
@@ -1136,35 +1140,35 @@ class FeedbackLoopController {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(`Feedback setup failed: ${message}`);
+      vscode.window.showErrorMessage(`Consider setup failed: ${message}`);
     }
   }
 
   private async promptForUninstallPlan(): Promise<
-    { removeFeedbackDir: boolean; removeGitignoreEntry: boolean } | undefined
+    { removeConsiderDir: boolean; removeGitignoreEntry: boolean } | undefined
   > {
     interface UninstallOption extends vscode.QuickPickItem {
-      removeFeedbackDir: boolean;
+      removeConsiderDir: boolean;
       removeGitignoreEntry: boolean;
     }
 
     const choices: UninstallOption[] = [
       {
         label: 'Full uninstall',
-        description: 'Remove .feedback data, deployed CLI, tracked skills, and .gitignore entry',
-        removeFeedbackDir: true,
+        description: 'Remove .consider data, deployed CLI, tracked skills, and .gitignore entry',
+        removeConsiderDir: true,
         removeGitignoreEntry: true,
       },
       {
         label: 'Skills only',
-        description: 'Remove tracked skills and keep .feedback data in this workspace',
-        removeFeedbackDir: false,
+        description: 'Remove tracked skills and keep .consider data in this workspace',
+        removeConsiderDir: false,
         removeGitignoreEntry: false,
       },
     ];
 
     const selected = await vscode.window.showQuickPick(choices, {
-      placeHolder: 'Choose what Feedback uninstall should remove',
+      placeHolder: 'Choose what Consider uninstall should remove',
       ignoreFocusOut: true,
     });
     if (!selected) {
@@ -1172,9 +1176,9 @@ class FeedbackLoopController {
     }
 
     const confirm = await vscode.window.showWarningMessage(
-      selected.removeFeedbackDir
+      selected.removeConsiderDir
         ? 'This will remove Consider data and uninstall tracked skills. Continue?'
-        : 'This will uninstall tracked skills and keep .feedback data. Continue?',
+        : 'This will uninstall tracked skills and keep .consider data. Continue?',
       { modal: true },
       'Uninstall'
     );
@@ -1184,7 +1188,7 @@ class FeedbackLoopController {
     }
 
     return {
-      removeFeedbackDir: selected.removeFeedbackDir,
+      removeConsiderDir: selected.removeConsiderDir,
       removeGitignoreEntry: selected.removeGitignoreEntry,
     };
   }
@@ -1193,7 +1197,7 @@ class FeedbackLoopController {
     try {
       if (this.context.extensionMode === vscode.ExtensionMode.Test) {
         runUninstallAgentIntegration(this.projectRoot, {
-          removeFeedbackDir: true,
+          removeConsiderDir: true,
           removeGitignoreEntry: true,
         });
         this.reloadFromStore();
@@ -1208,17 +1212,20 @@ class FeedbackLoopController {
       const result = runUninstallAgentIntegration(this.projectRoot, uninstallPlan);
       this.reloadFromStore();
 
-      if (result.feedbackDirRemoved) {
+      if (result.considerDirRemoved) {
         await this.context.workspaceState.update('consider.setupPromptShown', false);
       }
 
       const summary: string[] = [];
-      if (result.feedbackDirRemoved) {
-        summary.push('.feedback removed');
-      } else if (uninstallPlan.removeFeedbackDir && result.feedbackDirAbsent) {
-        summary.push('.feedback already absent');
+      if (result.considerDirRemoved) {
+        summary.push('.consider removed');
+      } else if (uninstallPlan.removeConsiderDir && result.considerDirAbsent) {
+        summary.push('.consider already absent');
       } else {
-        summary.push('.feedback retained');
+        summary.push('.consider retained');
+      }
+      if (result.legacyFeedbackDirRemoved) {
+        summary.push('legacy .feedback removed');
       }
 
       if (result.gitignoreSkipped) {
@@ -1246,7 +1253,7 @@ class FeedbackLoopController {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      vscode.window.showErrorMessage(`Feedback uninstall failed: ${message}`);
+      vscode.window.showErrorMessage(`Consider uninstall failed: ${message}`);
     }
   }
 
@@ -1273,7 +1280,7 @@ class FeedbackLoopController {
 
     const selected = await vscode.window.showQuickPick(options, {
       canPickMany: true,
-      placeHolder: 'Toggle visibility checkboxes for Feedback comments',
+      placeHolder: 'Toggle visibility checkboxes for Consider comments',
       ignoreFocusOut: true,
     });
     if (!selected) {
@@ -1301,7 +1308,7 @@ class FeedbackLoopController {
     const result = archiveResolvedComments(this.projectRoot, store);
     if (result.archivedCount === 0) {
       vscode.window.showInformationMessage(
-        'Feedback: No resolved comments to archive.'
+        'Consider: No resolved comments to archive.'
       );
       return;
     }
@@ -1310,9 +1317,9 @@ class FeedbackLoopController {
     this.reloadFromStore();
 
     vscode.window.showInformationMessage(
-      `Feedback: Archived ${result.archivedCount} resolved comment${
+      `Consider: Archived ${result.archivedCount} resolved comment${
         result.archivedCount === 1 ? '' : 's'
-      } to .feedback/archive.json.`
+      } to .consider/archive.json.`
     );
   }
 
@@ -1323,7 +1330,7 @@ class FeedbackLoopController {
     const comment = findComment(store, commentId);
     if (!comment) {
       vscode.window.showWarningMessage(
-        `Feedback comment ${commentId} was not found in the store.`
+        `Consider comment ${commentId} was not found in the store.`
       );
       return;
     }
@@ -1337,7 +1344,7 @@ class FeedbackLoopController {
     }
     if (!fileExists) {
       vscode.window.showWarningMessage(
-        `Feedback comment ${commentId} points to missing file: ${comment.file}`
+        `Consider comment ${commentId} points to missing file: ${comment.file}`
       );
       return;
     }
@@ -1380,7 +1387,7 @@ class FeedbackLoopController {
       ? `updated ${result.updatedComments} comment${result.updatedComments === 1 ? '' : 's'}`
       : 'no anchor updates needed';
     vscode.window.showInformationMessage(
-      `Feedback: Reconcile All checked ${result.checkedComments} comment${result.checkedComments === 1 ? '' : 's'}; ${summary}.`
+      `Consider: Reconcile All checked ${result.checkedComments} comment${result.checkedComments === 1 ? '' : 's'}; ${summary}.`
     );
   }
 
@@ -1536,23 +1543,25 @@ class FeedbackLoopController {
   // --- Store file watcher ---
 
   private setupStoreWatcher(): void {
-    const pattern = new vscode.RelativePattern(
-      this.projectRoot,
-      '.feedback/store.json'
-    );
-    this.storeWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+    const relativePaths = ['.consider/store.json', '.feedback/store.json'];
 
-    this.storeWatcher.onDidChange(() => {
-      if (this.suppressWatcher) return;
-      this.reloadFromStore();
-    });
+    for (const relativePath of relativePaths) {
+      const pattern = new vscode.RelativePattern(this.projectRoot, relativePath);
+      const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
-    this.storeWatcher.onDidCreate(() => {
-      if (this.suppressWatcher) return;
-      this.reloadFromStore();
-    });
+      watcher.onDidChange(() => {
+        if (this.suppressWatcher) return;
+        this.reloadFromStore();
+      });
 
-    this.disposables.push(this.storeWatcher);
+      watcher.onDidCreate(() => {
+        if (this.suppressWatcher) return;
+        this.reloadFromStore();
+      });
+
+      this.storeWatchers.push(watcher);
+      this.disposables.push(watcher);
+    }
   }
 
   private isCommentVisible(comment: FeedbackComment): boolean {
@@ -1835,7 +1844,7 @@ class FeedbackLoopController {
     comment: FeedbackComment
   ): void {
     const statusText = statusTagText(comment);
-    thread.label = statusText.length > 0 ? `Feedback • ${statusText}` : 'Feedback';
+    thread.label = statusText.length > 0 ? `Consider • ${statusText}` : 'Consider';
     thread.canReply = comment.workflowState !== 'resolved';
     thread.contextValue = threadContextValue(comment);
 
@@ -1865,7 +1874,7 @@ class FeedbackLoopController {
         // ask the user to retry rather than silently overwriting.
         this.reloadFromStore();
         vscode.window.showWarningMessage(
-          'Feedback store changed while saving. Please retry your last action.'
+          'Consider store changed while saving. Please retry your last action.'
         );
         return;
       }
@@ -1896,7 +1905,7 @@ class FeedbackLoopController {
 
 // --- Extension lifecycle ---
 
-let controller: FeedbackLoopController | undefined;
+let controller: ConsiderController | undefined;
 
 const WORKSPACE_REQUIRED_COMMANDS = [
   'consider.addComment',
@@ -1931,7 +1940,7 @@ function registerWorkspaceWarningCommands(
 }
 
 function initializeController(context: vscode.ExtensionContext): void {
-  controller = new FeedbackLoopController(context);
+  controller = new ConsiderController(context);
   context.subscriptions.push(
     new vscode.Disposable(() => {
       controller?.dispose();

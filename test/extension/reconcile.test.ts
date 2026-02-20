@@ -11,7 +11,7 @@ const extensionReconcile = require(path.join(ROOT, 'extension', 'out', 'reconcil
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-ext-reconcile-'));
-  fs.mkdirSync(path.join(dir, '.feedback'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.consider'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   return dir;
 }

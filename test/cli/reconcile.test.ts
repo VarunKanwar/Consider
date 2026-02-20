@@ -9,11 +9,11 @@ const { execFileSync } = require('child_process');
 const ROOT = process.cwd();
 const reconcile = require(path.join(ROOT, 'shared', 'reconcile.js'));
 
-const CLI_PATH = path.join(ROOT, 'cli', 'feedback-cli.js');
+const CLI_PATH = path.join(ROOT, 'cli', 'consider-cli.js');
 
 function makeTmpProject() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'feedback-reconcile-'));
-  fs.mkdirSync(path.join(dir, '.feedback'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.consider'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'src'), { recursive: true });
   return dir;
 }
@@ -30,14 +30,14 @@ function writeFile(dir, file, content) {
 
 function seedStore(dir, comments) {
   fs.writeFileSync(
-    path.join(dir, '.feedback', 'store.json'),
+    path.join(dir, '.consider', 'store.json'),
     JSON.stringify({ version: 1, comments }, null, 2) + '\n',
     'utf-8'
   );
 }
 
 function readStoreFile(dir) {
-  return JSON.parse(fs.readFileSync(path.join(dir, '.feedback', 'store.json'), 'utf-8'));
+  return JSON.parse(fs.readFileSync(path.join(dir, '.consider', 'store.json'), 'utf-8'));
 }
 
 function makeComment({

@@ -12,25 +12,25 @@
 2. Press **F5** (or Run > Start Debugging). Select "Run Extension" if prompted.
 3. A new VS Code window (Extension Development Host) should open.
 4. **Expected:** No errors in the Debug Console. The extension is active immediately on startup (no command needed first).
-5. If the workspace does not yet have `.feedback/store.json`, **Expected:** a one-time setup prompt appears with actions like **Set Up Now** / **Later**.
+5. If the workspace does not yet have `.consider/store.json`, **Expected:** a one-time setup prompt appears with actions like **Set Up Now** / **Later**.
 
 ## Test 2: Setup Agent Integration
 
 1. In the Extension Development Host window, open any project folder.
 2. Open the Command Palette (Cmd+Shift+P / Ctrl+Shift+P).
-3. Run **Feedback: Setup Agent Integration**.
+3. Run **Consider: Setup Agent Integration**.
 4. In the guided flow:
    - use the single setup panel to:
-     - choose whether to add `.feedback/` to `.gitignore`,
+     - choose whether to add `.consider/` to `.gitignore`,
      - check/uncheck integrations (Claude/OpenCode/Codex),
      - set install location per selected integration (`Workspace` or `Home`) with the scope switch.
 4. **Expected:**
-   - `.feedback/store.json` exists.
-   - `.feedback/bin/feedback-cli`, `.feedback/bin/feedback-cli.js`, and `.feedback/bin/feedback-cli.cjs` exist.
-   - `.feedback/bin/package.json` exists with `"type": "commonjs"`.
-   - `.feedback/shared/store.js` and `.feedback/shared/reconcile.js` exist.
-   - `.feedback/shared/package.json` exists with `"type": "commonjs"`.
-   - If `.gitignore` update was selected, `.gitignore` contains `.feedback/` exactly once.
+   - `.consider/store.json` exists.
+   - `.consider/bin/consider-cli`, `.consider/bin/consider-cli.js`, and `.consider/bin/consider-cli.cjs` exist.
+   - `.consider/bin/package.json` exists with `"type": "commonjs"`.
+   - `.consider/shared/store.js` and `.consider/shared/reconcile.js` exist.
+   - `.consider/shared/package.json` exists with `"type": "commonjs"`.
+   - If `.gitignore` update was selected, `.gitignore` contains `.consider/` exactly once.
    - If no integrations are selected, no new skill files are written.
    - If integrations were selected, only selected targets are written/updated using each target's selected location:
      - Workspace install:
@@ -55,7 +55,7 @@
 6. **Expected:**
    - The comment appears inline next to the line.
    - Author shows as "Developer".
-   - `.feedback/store.json` now contains the comment with correct file path, line numbers, and body text.
+   - `.consider/store.json` now contains the comment with correct file path, line numbers, and body text.
    - The comment has `"workflowState": "open"` and `"anchorState": "anchored"`.
 
 If the `+` icon never appears:
@@ -101,11 +101,11 @@ If the `+` icon never appears:
 This is the key test for the file watcher.
 
 1. Add a comment in the Extension Development Host (from Test 3).
-2. Note the comment ID from `.feedback/store.json` (e.g., `c_abc12345`).
+2. Note the comment ID from `.consider/store.json` (e.g., `c_abc12345`).
 3. Open a terminal in the project directory.
 4. Run:
    ```sh
-   .feedback/bin/feedback-cli reply c_abc12345 --message "I will fix this."
+   .consider/bin/consider-cli reply c_abc12345 --message "I will fix this."
    ```
    (Use the actual comment ID from your store.)
 5. **Expected:**
@@ -128,32 +128,32 @@ This is the key test for the file watcher.
 3. **Expected:**
    - Comments appear on the correct files and lines.
    - All comments are tracked in a single `store.json`.
-   - `feedback-cli list` shows all comments.
+   - `consider-cli list` shows all comments.
 
 ## Test 11: Show All Comments Tree View
 
 1. Ensure you have comments across at least two files and mixed statuses.
-2. Run **Feedback: Show All Comments**.
+2. Run **Consider: Show All Comments**.
 3. Use the visibility checkboxes:
    - **Show resolved**
    - **Show stale**
 4. **Expected:**
-   - Explorer shows a **Feedback Comments** view.
+   - Explorer shows a **Consider Comments** view.
    - Comments are grouped by file.
    - Comment rows show richer workflow/anchor state tags and comment ID in the description.
    - Selecting a comment row opens the target file and reveals the anchor line.
    - Each comment row has an inline toggle action (collapse icon) that collapses/expands only that comment thread.
    - Checkbox state updates visible comments in both:
-     - the **Feedback Comments** tree,
+     - the **Consider Comments** tree,
      - the built-in VS Code **COMMENTS** panel (hidden threads are removed from the panel until re-enabled).
 
 ## Test 12: Archive Resolved
 
 1. Resolve one or more comment threads.
-2. Run **Feedback: Archive Resolved**.
+2. Run **Consider: Archive Resolved**.
 3. **Expected:**
-   - Resolved comments are removed from `.feedback/store.json`.
-   - Archived records are appended to `.feedback/archive.json`.
+   - Resolved comments are removed from `.consider/store.json`.
+   - Archived records are appended to `.consider/archive.json`.
    - Non-resolved workflow comments remain in active store (regardless of anchor state).
    - Running again with no resolved comments reports a no-op message.
 
@@ -161,41 +161,41 @@ This is the key test for the file watcher.
 
 1. With several comments in the store, run:
    ```sh
-   .feedback/bin/feedback-cli summary
+   .consider/bin/consider-cli summary
    ```
 2. **Expected:** Shows the correct count of open comments and files.
    - Also shows unseen-open count and workflow/anchor breakdowns.
 
 ## Test 14: Setup Idempotency
 
-1. Run **Feedback: Setup Agent Integration** twice with:
+1. Run **Consider: Setup Agent Integration** twice with:
    - `.gitignore` update enabled,
    - Codex integration selected.
 2. **Expected:**
-   - No duplicate `.feedback/` entries in `.gitignore`.
+   - No duplicate `.consider/` entries in `.gitignore`.
    - Existing skill files are refreshed in place (single file per target path for the selected install scope).
    - Codex skill exists at `.codex/skills/consider/SKILL.md` (workspace scope) or `~/.codex/skills/consider/SKILL.md` (home scope).
 
 ## Test 15: Uninstall / Offboarding
 
 1. Ensure setup has run and at least one integration skill is installed.
-2. Run **Feedback: Uninstall** from the Command Palette.
+2. Run **Consider: Uninstall** from the Command Palette.
 3. In the uninstall flow, choose **Skills only**.
 4. **Expected:**
    - Installed skills tracked by setup are removed.
-   - `.feedback/store.json` remains.
-   - `.feedback/config.json` remains and tracked skill list is cleared.
-5. Run **Feedback: Setup Agent Integration** again and install at least one integration.
-6. Run **Feedback: Uninstall** and choose **Full uninstall**.
+   - `.consider/store.json` remains.
+   - `.consider/config.json` remains and tracked skill list is cleared.
+5. Run **Consider: Setup Agent Integration** again and install at least one integration.
+6. Run **Consider: Uninstall** and choose **Full uninstall**.
 7. **Expected:**
-   - `.feedback/` directory is removed.
+   - `.consider/` directory is removed.
    - Tracked skills are removed.
-   - `.feedback/` entry is removed from `.gitignore` if present.
+   - `.consider/` entry is removed from `.gitignore` if present.
    - Completion message summarizes removed/retained artifacts.
 
 ## Test 16: No Workspace Folder
 
 1. Open VS Code with no folder open (File > Close Folder).
 2. Launch the extension (F5).
-3. Try running any Feedback command from the Command Palette.
+3. Try running any Consider command from the Command Palette.
 4. **Expected:** A warning message says "Consider requires an open workspace folder."

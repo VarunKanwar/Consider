@@ -4,7 +4,7 @@ You are working on **Consider**, a VS Code extension and CLI tool for inline, bi
 
 ## Project overview
 
-Three components: a VS Code extension (TypeScript), a feedback store (`.feedback/store.json`), and a CLI tool (standalone Node.js, zero npm dependencies). The extension and CLI both read/write the same JSON store. Communication between developer and agent is mediated entirely through the filesystem — no IPC, no server.
+Three components: a VS Code extension (TypeScript), a feedback store (`.consider/store.json`), and a CLI tool (standalone Node.js, zero npm dependencies). The extension and CLI both read/write the same JSON store. Communication between developer and agent is mediated entirely through the filesystem — no IPC, no server.
 
 The spec has 5 hard constraints (Section 2). Memorize them. The most commonly violated one will be C5: the CLI must have zero npm dependencies and work with only Node builtins (`fs`, `path`, `crypto`, `process`).
 
@@ -18,7 +18,7 @@ This project is built in phases. **Complete one phase fully before starting the 
 - **Phase 4: Agent integration setup** — "Setup Agent Integration" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
 - **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
 - **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
-- **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.feedback/` fixed at project root, make agent skill installation explicit opt-in (not implicit side effect), and let users choose workspace vs home skill install scope.
+- **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.consider/` fixed at project root, make agent skill installation explicit opt-in (not implicit side effect), and let users choose workspace vs home skill install scope.
 - **Phase 8: Offboarding and uninstall UX** — Add a guided uninstall flow and track setup artifact locations so skill/runtime cleanup is deterministic and safe.
 
 When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
@@ -54,8 +54,8 @@ consider/
 │   ├── package.json            # Extension manifest
 │   └── tsconfig.json
 ├── cli/                        # CLI tool source (Node.js, zero dependencies)
-│   ├── feedback-cli.js         # Main implementation
-│   └── feedback-cli            # Shell wrapper
+│   ├── consider-cli.js         # Main implementation
+│   └── consider-cli            # Shell wrapper
 ├── shared/                     # Shared logic (if extracted — see spec Section 9.5)
 ├── test/                       # Test fixtures and test scripts
 │   ├── cli/
@@ -72,9 +72,9 @@ This is a starting point. Adjust as needed during implementation, but explain st
 
 **Extension:** TypeScript. Use VS Code's Comments API (not custom webview UI). Standard extension scaffolding via `yo code` or equivalent. The extension manifest (`package.json`) should declare the minimum VS Code engine version that supports the Comments API features we need.
 
-**CLI:** Node.js. Zero npm dependencies — only builtins. Must be invocable as `.feedback/bin/feedback-cli <command>` via the shell wrapper. See spec Section 6.1 for the wrapper script. The CLI is both the development source (in `cli/`) and a deployable artifact that gets copied into `.feedback/bin/` by the extension's setup command.
+**CLI:** Node.js. Zero npm dependencies — only builtins. Must be invocable as `.consider/bin/consider-cli <command>` via the shell wrapper. See spec Section 6.1 for the wrapper script. The CLI is both the development source (in `cli/`) and a deployable artifact that gets copied into `.consider/bin/` by the extension's setup command.
 
-**Store:** Single JSON file at `.feedback/store.json`. Schema defined in spec Section 4.2. Use atomic writes (write to temp file, then rename) to prevent corrupt reads during concurrent access.
+**Store:** Single JSON file at `.consider/store.json`. Schema defined in spec Section 4.2. Use atomic writes (write to temp file, then rename) to prevent corrupt reads during concurrent access.
 
 **Re-anchoring:** Both the CLI and extension implement this. The algorithm must produce identical results in both. Spec Section 4.3 has the full algorithm. Consider extracting into a shared `.js` file, but don't over-engineer the sharing mechanism.
 
@@ -95,7 +95,7 @@ cd extension && npm install && npm run compile
 # Run extension in development: F5 in VS Code (launch.json should be set up)
 
 # CLI (no build step)
-node cli/feedback-cli.js --help
+node cli/consider-cli.js --help
 
 # Tests
 npm test                        # Run all tests
@@ -158,13 +158,13 @@ Every phase must include tests. What "tests" means varies by phase:
 
 ## Important implementation notes
 
-**Atomic writes:** Both the CLI and extension must write `store.json` atomically (write to `.feedback/store.json.tmp`, then `fs.renameSync`). This prevents corrupt reads if one process reads while the other is mid-write.
+**Atomic writes:** Both the CLI and extension must write `store.json` atomically (write to `.consider/store.json.tmp`, then `fs.renameSync`). This prevents corrupt reads if one process reads while the other is mid-write.
 
 **Comment IDs:** Generate with `c_` prefix + random hex from `crypto.randomBytes`. Reply IDs use `r_` prefix. Keep them short enough to type in a CLI command but unique enough to avoid collisions.
 
-**File paths in the store:** Always relative to the project root. Never absolute paths. The CLI resolves them relative to the `.feedback/` directory's parent.
+**File paths in the store:** Always relative to the project root. Never absolute paths. The CLI resolves them relative to the `.consider/` directory's parent.
 
-**The extension copies the CLI into `.feedback/bin/`:** During the setup command, the extension copies the CLI source into the target project's `.feedback/bin/` directory. This means the CLI in `cli/` is the development source, and the copy in `.feedback/bin/` is the deployed artifact. They must be the same file. Don't introduce a build step between them.
+**The extension copies the CLI into `.consider/bin/`:** During the setup command, the extension copies the CLI source into the target project's `.consider/bin/` directory. This means the CLI in `cli/` is the development source, and the copy in `.consider/bin/` is the deployed artifact. They must be the same file. Don't introduce a build step between them.
 
 **State model is split:** Workflow and anchor tracking are separate fields in v1:
 - `workflowState`: `open` ↔ `resolved` (either party can resolve/reopen)

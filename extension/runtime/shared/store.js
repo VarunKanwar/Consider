@@ -1,5 +1,5 @@
 /**
- * Shared store logic for reading/writing .feedback/store.json.
+ * Shared store logic for reading/writing .consider/store.json.
  * Used by both the CLI and extension.
  * Zero npm dependencies — Node builtins only.
  */
@@ -12,18 +12,24 @@ const STORE_VERSION = 1;
 const STORE_LOCK_TIMEOUT_MS = 5000;
 const STORE_LOCK_RETRY_MS = 25;
 const STORE_LOCK_STALE_MS = 30000;
-const STORE_REVISION_KEY = '__feedbackStoreRevision';
+const STORE_DIR_NAME = '.consider';
+const LEGACY_STORE_DIR_NAME = '.feedback';
+const STORE_REVISION_KEY = '__considerStoreRevision';
 const VALID_WORKFLOW_STATES = new Set(['open', 'resolved']);
 const VALID_ANCHOR_STATES = new Set(['anchored', 'stale', 'orphaned']);
 
 /**
- * Find the project root by walking up from startDir looking for .feedback/.
+ * Find the project root by walking up from startDir looking for .consider/
+ * or legacy .feedback/.
  * Falls back to startDir itself if not found.
  */
 function findProjectRoot(startDir) {
   let dir = path.resolve(startDir);
   while (true) {
-    if (fs.existsSync(path.join(dir, '.feedback'))) {
+    if (
+      fs.existsSync(path.join(dir, STORE_DIR_NAME)) ||
+      fs.existsSync(path.join(dir, LEGACY_STORE_DIR_NAME))
+    ) {
       return dir;
     }
     const parent = path.dirname(dir);
@@ -33,8 +39,18 @@ function findProjectRoot(startDir) {
   return path.resolve(startDir);
 }
 
+function resolveStoreDirectoryName(projectRoot) {
+  if (fs.existsSync(path.join(projectRoot, STORE_DIR_NAME))) {
+    return STORE_DIR_NAME;
+  }
+  if (fs.existsSync(path.join(projectRoot, LEGACY_STORE_DIR_NAME))) {
+    return LEGACY_STORE_DIR_NAME;
+  }
+  return STORE_DIR_NAME;
+}
+
 function storePath(projectRoot) {
-  return path.join(projectRoot, '.feedback', 'store.json');
+  return path.join(projectRoot, resolveStoreDirectoryName(projectRoot), 'store.json');
 }
 
 function lockPath(projectRoot) {
@@ -268,7 +284,7 @@ function acquireStoreLock(projectRoot, options = {}) {
 
       if (Date.now() - startedAt >= timeoutMs) {
         const timeoutErr = new Error(
-          `Timed out waiting for feedback store lock after ${timeoutMs}ms.`
+          `Timed out waiting for Consider store lock after ${timeoutMs}ms.`
         );
         timeoutErr.code = 'ESTORELOCKTIMEOUT';
         throw timeoutErr;
@@ -292,7 +308,7 @@ function writeStoreLocked(projectRoot, store, options = {}) {
     !allowConflict
   ) {
     const conflictError = new Error(
-      'Feedback store changed since it was read. Retry with fresh state.'
+      'Consider store changed since it was read. Retry with fresh state.'
     );
     conflictError.code = 'ESTORECONFLICT';
     throw conflictError;
@@ -445,6 +461,7 @@ function markAgentSeen(comment, nowIso) {
 module.exports = {
   STORE_VERSION,
   findProjectRoot,
+  resolveStoreDirectoryName,
   storePath,
   emptyStore,
   readStore,
