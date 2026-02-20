@@ -59,7 +59,7 @@ The system has three components:
 │  - Reads/writes to the feedback store                   │
 │  - Watches store.json for agent replies (file watcher)  │
 │  - Re-anchors comments for open/viewed files            │
-│  - "Setup Agent Integration" command                    │
+│  - "Setup" command                    │
 └──────────────────────┬──────────────────────────────────┘
                        │ reads/writes
                        ▼
@@ -271,7 +271,7 @@ The extension should register the following commands:
 
 **Add Comment** — Opens a comment thread at the current cursor position or selection. The developer types their feedback and it is saved to the store with `workflowState=open` and `anchorState=anchored`. The comment is immediately visible to the CLI — there is no draft or queue state. The developer controls when the agent sees feedback by controlling when they tell the agent to check (via the main conversation or skill-prompted behavior), not by managing comment visibility.
 
-**Consider: Setup Agent Integration** — Runs a guided setup flow: initializes `.consider/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
+**Consider: Setup** — Runs a guided setup flow: initializes `.consider/`, deploys the CLI, optionally updates `.gitignore`, and optionally writes selected agent integrations. See Section 8.
 
 On first run in a workspace without `.consider/store.json`, the extension should surface a lightweight setup prompt so onboarding is discoverable without forcing side effects.
 
@@ -426,7 +426,7 @@ Comment threads are *not* part of the main conversation history. They exist in t
 
 ### 8.1 Skill Files
 
-The "Setup Agent Integration" command can write skill files into the project when the developer explicitly opts in. Each skill file explains the feedback system to the agent: what the CLI commands are, what the conventions are, and how to use them.
+The "Setup" command can write skill files into the project when the developer explicitly opts in. Each skill file explains the feedback system to the agent: what the CLI commands are, what the conventions are, and how to use them.
 
 **For Claude Code:**
 - Project-local: `.claude/skills/consider/SKILL.md`
@@ -452,7 +452,7 @@ The "Setup Agent Integration" command can write skill files into the project whe
 
 ### 8.2 Setup Command Behavior
 
-When the developer runs "Consider: Setup Agent Integration":
+When the developer runs "Consider: Setup":
 
 1. Create `.consider/` directory if it doesn't exist.
 2. Create `.consider/bin/` and copy/generate the CLI tool files.
@@ -594,7 +594,7 @@ The recommended build order, with each step producing a usable increment:
 
 **Phase 3: Content-based anchoring** — Implement the anchor data model, mtime-based change detection, and the re-anchoring algorithm. This logic must work in both the CLI (lazy on read) and the extension (on file open, external change, and active editing). Test with various edit patterns: insertions above a comment, deletions, function renames, file deletions. Implement staleness and orphan detection. This is the riskiest technical piece and should be tackled early.
 
-**Phase 4: Agent integration setup** — Implement the "Setup Agent Integration" command. Write the skill files for Claude Code, OpenCode, and Codex. Test the full loop: developer adds comments in VS Code → tells agent (or agent checks via skill-prompted behavior) → agent reads via CLI → agent replies via CLI → developer sees replies inline.
+**Phase 4: Agent integration setup** — Implement the "Setup" command. Write the skill files for Claude Code, OpenCode, and Codex. Test the full loop: developer adds comments in VS Code → tells agent (or agent checks via skill-prompted behavior) → agent reads via CLI → agent replies via CLI → developer sees replies inline.
 
 **Phase 5: Polish** — Tree view panel for all comments, archive/cleanup for resolved threads, visual refinements (stale/orphaned indicators), Reconcile All command, stale comment management UX.
 

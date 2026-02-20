@@ -73,7 +73,7 @@
    - **Startup load** — reads all comments from the store on activation and creates visual threads.
    - **Watcher suppression** — the extension suppresses its own file watcher during writes to avoid re-reading its own changes.
    - **Graceful no-workspace handling** — if no workspace folder is open, commands show a warning message.
-   - **Phase 3/4/5 stubs** — Reconcile All, Setup Agent Integration (basic), Show All Comments, and Archive Resolved are registered as commands with placeholder behavior.
+   - **Phase 3/4/5 stubs** — Reconcile All, Setup (basic), Show All Comments, and Archive Resolved are registered as commands with placeholder behavior.
 
 4. **Manual testing guide** (`docs/manual-testing.md`)
    - 12 step-by-step test scenarios covering: extension launch, add/reply/resolve/delete comments, agent reply via CLI (bidirectional communication), startup load, multi-file, and no-workspace edge case.
@@ -169,7 +169,7 @@
 ### What's known to be incomplete
 
 - **Manual stale/orphan re-anchor UX** in extension is still minimal (no dedicated interactive re-anchor flow yet; only force reconcile and automatic open-file updates exist).
-- **Phase 4 items remain:** full Setup Agent Integration (CLI deployment + skill generation).
+- **Phase 4 items remain:** full Setup (CLI deployment + skill generation).
 - **Phase 5 items remain:** tree view, archive-resolved workflow, and polish UX.
 
 ---
@@ -392,7 +392,7 @@
    - Setup still keeps feedback data rooted at fixed `<project-root>/.consider/`.
 
 2. **Guided setup UX in extension command path** (`extension/src/extension.ts`)
-   - `Consider: Setup Agent Integration` is now a guided flow:
+   - `Consider: Setup` is now a guided flow:
      - shows a single setup panel that includes `.gitignore` choice,
      - includes checkboxes for Claude/OpenCode/Codex,
      - includes workspace/home scope switches per selected integration in that same panel,

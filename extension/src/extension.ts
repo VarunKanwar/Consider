@@ -388,7 +388,7 @@ class ConsiderController {
       )
     );
 
-    // Setup Agent Integration
+    // Setup
     this.disposables.push(
       vscode.commands.registerCommand(
         'consider.setupAgentIntegration',

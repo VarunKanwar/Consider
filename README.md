@@ -7,7 +7,7 @@ TODO: GIF showing the flow of comment creation in the editor -> skill invocation
 ## Quickstart:
 
 - VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=consider
-- Open the command palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run `Consider: Setup Agent Integration` to configure your agent integrations.
+- Open the command palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run `Consider: Setup` to configure your agent integrations.
   - This will create a `.consider/` directory and optionally add it to `.gitignore`.
   - This will also install a `/consider` skill on selected agents, allowing them to read and write comments.
 
@@ -21,7 +21,7 @@ TODO: GIF showing the flow of comment creation in the editor -> skill invocation
 ## 60-Second First Loop
 
 1. Open your workspace in VS Code with Consider active.
-2. Run `Consider: Setup Agent Integration`.
+2. Run `Consider: Setup`.
 3. In setup, choose:
    - whether to add `.consider/` to `.gitignore`,
    - which integrations to install,

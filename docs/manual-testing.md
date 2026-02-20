@@ -14,11 +14,11 @@
 4. **Expected:** No errors in the Debug Console. The extension is active immediately on startup (no command needed first).
 5. If the workspace does not yet have `.consider/store.json`, **Expected:** a one-time setup prompt appears with actions like **Set Up Now** / **Later**.
 
-## Test 2: Setup Agent Integration
+## Test 2: Setup
 
 1. In the Extension Development Host window, open any project folder.
 2. Open the Command Palette (Cmd+Shift+P / Ctrl+Shift+P).
-3. Run **Consider: Setup Agent Integration**.
+3. Run **Consider: Setup**.
 4. In the guided flow:
    - use the single setup panel to:
      - choose whether to add `.consider/` to `.gitignore`,
@@ -168,7 +168,7 @@ This is the key test for the file watcher.
 
 ## Test 14: Setup Idempotency
 
-1. Run **Consider: Setup Agent Integration** twice with:
+1. Run **Consider: Setup** twice with:
    - `.gitignore` update enabled,
    - Codex integration selected.
 2. **Expected:**
@@ -185,7 +185,7 @@ This is the key test for the file watcher.
    - Installed skills tracked by setup are removed.
    - `.consider/store.json` remains.
    - `.consider/config.json` remains and tracked skill list is cleared.
-5. Run **Consider: Setup Agent Integration** again and install at least one integration.
+5. Run **Consider: Setup** again and install at least one integration.
 6. Run **Consider: Uninstall** and choose **Full uninstall**.
 7. **Expected:**
    - `.consider/` directory is removed.

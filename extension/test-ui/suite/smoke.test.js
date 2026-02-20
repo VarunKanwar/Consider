@@ -171,7 +171,7 @@ async function setupViaWebview() {
   const editorView = new EditorView();
   await withRetry('open setup webview', RETRY_ATTEMPTS, async () => {
     await dismissSetupPromptIfPresent();
-    await workbench.executeCommand('Consider: Setup Agent Integration');
+    await workbench.executeCommand('Consider: Setup');
 
     let setupTitle;
     await waitFor(async () => {

@@ -15,7 +15,7 @@ This project is built in phases. **Complete one phase fully before starting the 
 - **Phase 1: Store format + CLI skeleton** — JSON schema, CLI with `list`, `get`, `reply`, `resolve`, `summary`, `context`. Static line numbers, no reconciliation yet. Testable by hand-editing `store.json`.
 - **Phase 2: Extension skeleton** — VS Code Comments API wired up. Add/view/reply/resolve comments. Persist to store. File watcher for agent replies.
 - **Phase 3: Content-based anchoring** — Re-anchoring algorithm in both CLI and extension. Mtime-based change detection. Staleness and orphan detection. This is the riskiest piece — test thoroughly.
-- **Phase 4: Agent integration setup** — "Setup Agent Integration" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
+- **Phase 4: Agent integration setup** — "Setup" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
 - **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
 - **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
 - **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.consider/` fixed at project root, make agent skill installation explicit opt-in (not implicit side effect), and let users choose workspace vs home skill install scope.

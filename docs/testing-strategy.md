@@ -123,7 +123,7 @@ Note: GitHub branch protection availability depends on repository visibility/pla
 Before a release candidate:
 
 1. Run full manual test guide.
-2. Validate setup idempotency (`Consider: Setup Agent Integration` run multiple times).
+2. Validate setup idempotency (`Consider: Setup` run multiple times).
 3. Validate full loop in a clean workspace:
    - setup,
    - add comment,

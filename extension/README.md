@@ -20,7 +20,7 @@ You comment in VS Code. Your agent replies via a local CLI. Comment data stays i
 
 1. Install the extension.
 2. Open a workspace folder.
-3. Run `Consider: Setup Agent Integration`.
+3. Run `Consider: Setup`.
 4. In setup, choose `.gitignore` handling, integrations, and workspace/home install scope.
 5. Add an inline comment using the gutter `+` (or `Add Comment`).
 6. In terminal, run:
@@ -46,7 +46,7 @@ You comment in VS Code. Your agent replies via a local CLI. Comment data stays i
 - `Add Comment`
 - `Reply`
 - `Resolve` / `Unresolve`
-- `Consider: Setup Agent Integration`
+- `Consider: Setup`
 - `Consider: Uninstall`
 - `Consider: Show All Comments`
 - `Consider: Archive Resolved`
@@ -61,7 +61,7 @@ You comment in VS Code. Your agent replies via a local CLI. Comment data stays i
 ## Troubleshooting
 
 - If comments appear stale after heavy edits, run `Consider: Reconcile All`.
-- If the extension is installed but not initialized in a workspace, run `Consider: Setup Agent Integration`.
+- If the extension is installed but not initialized in a workspace, run `Consider: Setup`.
 - For UI/platform caveats, see known limitations in the repository docs.
 
 ## Project Links

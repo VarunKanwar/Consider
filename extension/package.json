@@ -3,8 +3,8 @@
   "displayName": "Consider",
   "description": "Inline bidirectional feedback between developers and AI agents",
   "version": "0.1.0",
-  "publisher": "consider",
-  "license": "UNLICENSED",
+  "publisher": "VarunKanwar",
+  "license": "MIT",
   "homepage": "https://github.com/VarunKanwar/consider#readme",
   "bugs": {
     "url": "https://github.com/VarunKanwar/consider/issues"
@@ -55,7 +55,7 @@
       },
       {
         "command": "consider.setupAgentIntegration",
-        "title": "Consider: Setup Agent Integration"
+        "title": "Consider: Setup"
       },
       {
         "command": "consider.uninstallAgentIntegration",
