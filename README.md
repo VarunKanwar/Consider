@@ -1,46 +1,47 @@
 # Consider
 
-_Consider_ adds code-review-style comment threads to local files in VS Code, and enables agents to participate via [skills](https://code.claude.com/docs/en/skills). Iterate on design and implementation in place, with discussions anchored to the exact lines they refer to.
+_Consider_ adds pull request-style inline feedback threads to VS Code, streamlining mixed initiative (developer + agent) workflows.
+
+Add comments and invoke the `consider` skill. Your agent considers your feedback and replies or acts, and eventually resolves open threads. Conversation history is stored locally, separate from your code.
 
 TODO: GIF showing the flow of comment creation in the editor -> skill invocation -> agent response in the thread
 
-## Quickstart:
+## Features
 
-- VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=consider
-- Open the command palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run `Consider: Setup` to configure your agent integrations.
-  - This will create a `.consider/` directory and optionally add it to `.gitignore`.
-  - This will also install a `/consider` skill on selected agents, allowing them to read and write comments.
+- Inline comment threads anchored to files and line ranges.
+- Agent replies synced through a shared filesystem store.
+- Content-based anchor reconciliation after code edits.
+- Workflow + anchor state tracking:
+  - `Workflow State`: `Open` / `Resolved`
+  - `Anchor State`: `Anchored` / `Stale` / `Orphaned`
+- Consider comments tree view in Explorer for file-grouped navigation.
+- Archive resolved comments.
+- Guided setup and uninstall flows for agent integration.
 
+## Quickstart
 
-
-- Inline comments anchored to line/range.
-- Agent replies from terminal via `consider-cli`.
-- Shared local store at `.consider/store.json`.
-- Content-based re-anchoring after edits.
-
-## 60-Second First Loop
-
-1. Open your workspace in VS Code with Consider active.
-2. Run `Consider: Setup`.
+1. Install the extension from VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=consider
+2. Open the command palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run `Consider: Setup`.
 3. In setup, choose:
-   - whether to add `.consider/` to `.gitignore`,
-   - which integrations to install,
-   - workspace vs home install scope for each selected integration.
-4. Add a comment from the editor gutter `+` or run `Add Comment`.
-5. In terminal, list open feedback:
-   ```sh
-   .consider/bin/consider-cli list
-   ```
-6. Reply as the agent:
-   ```sh
-   .consider/bin/consider-cli reply <comment-id> --message "I will update this."
-   ```
-7. Resolve when done:
-   ```sh
-   .consider/bin/consider-cli resolve <comment-id>
-   ```
+   - whether to add the comment store (`.consider/`) to `.gitignore`,
+   - which skill integrations to install (OpenAI, Anthropic, OpenCode, etc.)
+4. Add a comment from the editor gutter `+` or run `Add Comment` from the command palette.
+5. Run the `consider` skill from your agent. Optionally pass a file path, comment ID, or message to specify a focus area or additional instructions for the agent.
 
-## Agent Command Reference
+## Core Commands
+
+### Editor Commands
+
+- `Add Comment`
+- `Reply`
+- `Resolve` / `Unresolve`
+- `Consider: Setup`
+- `Consider: Uninstall`
+- `Consider: Show All Comments`
+- `Consider: Archive Resolved`
+- `Consider: Reconcile All`
+
+### Agent Commands (via `consider-cli`)
 
 ```sh
 .consider/bin/consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]
@@ -52,34 +53,28 @@ TODO: GIF showing the flow of comment creation in the editor -> skill invocation
 .consider/bin/consider-cli summary [--json]
 ```
 
-## Trust And Boundaries
+## Privacy and Security
 
-- Comment data stays local in fixed project path `.consider/`.
-- `.consider/` can be added to `.gitignore` during setup.
-- Core workflow is filesystem-only: no server, no IPC.
+- Local comment store located at `.consider/` at the root of your project.
+  - `.consider/` can be added to `.gitignore` automatically during setup.
+  - Core workflow is filesystem-only: no server, no IPC. The extension never makes network requests.
+- Your agents access comment data by invoking the `consider-cli` binary, which reads from and writes to the local comment store.
 - Agent integration files are explicit opt-in in setup and removable via `Consider: Uninstall`.
 
-## Architecture (One Line)
+## Troubleshooting
 
-```text
-VS Code Extension <-> .consider/store.json <-> consider-cli
-```
+- If comments appear stale after heavy edits, run `Consider: Reconcile All`.
+- If the extension is installed but not initialized in a workspace, run `Consider: Setup`.
+- For UI/platform caveats, see known limitations in the repository docs.
 
-## Status
+## Project Links
 
-Under active development.
+- Repository: <https://github.com/VarunKanwar/consider>
+- User + repo overview: <https://github.com/VarunKanwar/consider/blob/main/README.md>
+- Specification: <https://github.com/VarunKanwar/consider/blob/main/docs/spec.md>
+- Known limitations: <https://github.com/VarunKanwar/consider/blob/main/docs/known-limitations.md>
 
-- Build progress: `docs/progress.md`
-- Current limitations: `docs/known-limitations.md`
-
-## Documentation Map
-
-- Start here as a user: `extension/README.md`
-- Full specification: `docs/spec.md`
-- Manual test flows: `docs/manual-testing.md`
-- Testing policy: `docs/testing-strategy.md`
-- Agent contributor instructions: `AGENTS.md`
 
 ## License
 
-TBD
+MIT
