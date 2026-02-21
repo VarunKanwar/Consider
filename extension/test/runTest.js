@@ -21,12 +21,17 @@ async function main() {
     const workspacePath = isolated.workspacePath;
     const userDataDir = path.join(tmpRoot, 'user-data');
     const extensionsDir = path.join(tmpRoot, 'extensions');
+    // Some environments export this flag globally, which makes Electron
+    // behave like Node and breaks extension-host startup.
+    delete process.env.ELECTRON_RUN_AS_NODE;
+    const extensionTestsEnv = { ...process.env };
     fs.mkdirSync(userDataDir, { recursive: true });
     fs.mkdirSync(extensionsDir, { recursive: true });
 
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
+      extensionTestsEnv,
       launchArgs: [
         workspacePath,
         '--disable-extensions',
