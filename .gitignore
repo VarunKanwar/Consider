@@ -3,6 +3,7 @@ dist/
 out/
 test/out/
 .consider/
+.claude/
 *.vsix
 *.tgz
 .DS_Store

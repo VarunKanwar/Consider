@@ -20,7 +20,7 @@ TODO: GIF showing the flow of comment creation in the editor -> skill invocation
 
 ## Quickstart
 
-1. Install the extension from VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=consider
+1. Install the extension from VS Code Marketplace: https://marketplace.visualstudio.com/items?itemName=VarunKanwar.consider
 2. Open the command palette (Cmd+Shift+P on Mac, Ctrl+Shift+P on Windows/Linux) and run `Consider: Setup`.
 3. In setup, choose:
    - whether to add the comment store (`.consider/`) to `.gitignore`,
