@@ -14,11 +14,11 @@ const LEGACY_FEEDBACK_DIR_NAME = '.feedback';
 
 const SKILL_DESCRIPTIONS: Record<SetupIntegrationTarget, string> = {
   claude:
-    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the Consider CLI.',
+    'Use when this repository has Consider enabled and you need to triage inline feedback, run consider-cli commands, or handle a shared threadID token.',
   opencode:
-    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the Consider CLI.',
+    'Use when this repository has Consider enabled and you need to triage inline feedback, run consider-cli commands, or handle a shared threadID token.',
   codex:
-    'Use when this repository has Consider enabled and you need to review, reply to, or resolve inline feedback via the Consider CLI.',
+    'Use when this repository has Consider enabled and you need to triage inline feedback, run consider-cli commands, or handle a shared threadID token.',
 };
 
 export interface AgentDetection {
@@ -443,20 +443,26 @@ function buildSkillMarkdown(target: SetupIntegrationTarget): string {
 You are configured with Consider inline review comments for this repository.
 Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedback.
 
+## Trigger Cues
+
+- Developer asks you to check Consider comments, run \`consider-cli\`, or address inline feedback.
+- Developer shares \`threadID: <comment-id>\` in chat.
+
 ## Workflow
 
 1. Before starting implementation, run:
    - \`.consider/bin/consider-cli summary\`
-2. If open comments exist, inspect them:
+2. If there are no open comments, say so briefly and continue the main task.
+3. If open comments exist, inspect them:
    - \`.consider/bin/consider-cli list\`
    - \`.consider/bin/consider-cli context <comment-id>\`
-3. If the developer shares \`threadID: <comment-id>\`, fetch that exact thread:
+4. If the developer shares \`threadID: <comment-id>\`, fetch that exact thread:
    - \`.consider/bin/consider-cli thread <comment-id>\`
-4. Reply directly in the thread:
+5. Reply directly in the thread:
    - \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
-5. Resolve only after the requested action is complete (or the developer confirms no change is needed):
+6. Resolve only after the requested action is complete (or the developer confirms no change is needed):
    - \`.consider/bin/consider-cli resolve <comment-id>\`
-6. Reopen if follow-up work remains:
+7. Reopen if follow-up work remains:
    - \`.consider/bin/consider-cli unresolve <comment-id>\`
 
 ## Conventions
@@ -473,17 +479,40 @@ Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedb
 - If a comment is informational or preference-only, prefer a brief in-thread acknowledgement and no code edits.
 - The source-of-truth store is \`.consider/store.json\`; use the CLI unless debugging.
 
-## Commands
+## Failure Handling
 
+- If CLI reports store busy/conflict, retry once before escalating.
+- If CLI reports comment not found, rerun \`list\` and ask for a refreshed \`threadID\` if needed.
+- If \`context\` reports orphaned/missing file, flag it in main chat and ask whether to resolve, reopen, or remap.
+
+## Quick Reference
+
+- \`.consider/bin/consider-cli summary [--json]\`
 - \`.consider/bin/consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]\`
-- \`.consider/bin/consider-cli get <comment-id> [--json]\`
 - \`.consider/bin/consider-cli thread <comment-id> [--json]\`
-- \`.consider/bin/consider-cli context <comment-id> [--lines N] [--json]\`
 - \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
 - \`.consider/bin/consider-cli resolve <comment-id>\`
 - \`.consider/bin/consider-cli unresolve <comment-id>\`
-- \`.consider/bin/consider-cli summary [--json]\`
 `;
+}
+
+function buildCodexOpenAiMetadata(): string {
+  return [
+    'interface:',
+    '  display_name: "Consider"',
+    '  short_description: "Review and reply to inline Consider threads"',
+    '  default_prompt: "Use $consider to review open Consider comments, reply in thread, and resolve completed feedback."',
+    '',
+  ].join('\n');
+}
+
+function writeCodexOpenAiMetadata(skillPath: string): string {
+  const skillDir = path.dirname(skillPath);
+  const agentsDir = path.join(skillDir, 'agents');
+  fs.mkdirSync(agentsDir, { recursive: true });
+  const metadataPath = path.join(agentsDir, 'openai.yaml');
+  fs.writeFileSync(metadataPath, buildCodexOpenAiMetadata(), 'utf-8');
+  return metadataPath;
 }
 
 function writeSkillFile(
@@ -682,6 +711,7 @@ export function runSetupAgentIntegration(
     }
     if (install.target === 'codex') {
       const skillPath = writeSkillFile(skillBaseDir, CODEX_SKILL_PATH, 'codex');
+      writeCodexOpenAiMetadata(skillPath);
       skillsWritten.push(skillPath);
       trackedSkillInstallsWritten.push({
         target: 'codex',

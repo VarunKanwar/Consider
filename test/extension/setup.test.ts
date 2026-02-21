@@ -78,6 +78,17 @@ function assertHasSkillFrontmatter(skillContent) {
   assert.ok(skillContent.includes('\n---\n\n# Consider\n'));
 }
 
+function assertHasCodexOpenAiMetadata(metadataContent) {
+  assert.ok(metadataContent.includes('interface:\n'));
+  assert.ok(metadataContent.includes('display_name: "Consider"\n'));
+  assert.ok(
+    metadataContent.includes(
+      'short_description: "Review and reply to inline Consider threads"\n'
+    )
+  );
+  assert.ok(metadataContent.includes('default_prompt: "Use $consider '));
+}
+
 function readJson(relativePath, projectRoot) {
   return JSON.parse(read(relativePath, projectRoot));
 }
@@ -190,6 +201,11 @@ describe('setup agent integration', () => {
     assert.ok(
       fs.existsSync(path.join(controlledHome, '.codex', 'skills', 'consider', 'SKILL.md'))
     );
+    assert.ok(
+      fs.existsSync(
+        path.join(controlledHome, '.codex', 'skills', 'consider', 'agents', 'openai.yaml')
+      )
+    );
     assert.ok(!fs.existsSync(path.join(projectRoot, '.claude')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.opencode')));
     assert.ok(!fs.existsSync(path.join(projectRoot, '.codex')));
@@ -237,10 +253,15 @@ describe('setup agent integration', () => {
     const claudeSkill = read('.claude/skills/consider/SKILL.md', projectRoot);
     const openCodeSkill = read('.opencode/skills/consider/SKILL.md', projectRoot);
     const codexSkill = read('.codex/skills/consider/SKILL.md', projectRoot);
+    const codexOpenAiMetadata = read(
+      '.codex/skills/consider/agents/openai.yaml',
+      projectRoot
+    );
 
     assertHasSkillFrontmatter(claudeSkill);
     assertHasSkillFrontmatter(openCodeSkill);
     assertHasSkillFrontmatter(codexSkill);
+    assertHasCodexOpenAiMetadata(codexOpenAiMetadata);
     assert.ok(
       codexSkill.includes(
         'Do not edit code unless there is a clear, explicit instruction to change code (in the thread or main chat).'

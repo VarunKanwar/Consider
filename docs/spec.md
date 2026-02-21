@@ -444,13 +444,15 @@ The "Setup" command can write skill files into the project when the developer ex
 **For Codex:**
 - Project-local: `.codex/skills/consider/SKILL.md`
 - Home-level: `~/.codex/skills/consider/SKILL.md`
+- Optional UI metadata: `<skill-dir>/agents/openai.yaml` (display name, short description, default prompt).
 
 **Skill file content should include:**
 - Required YAML frontmatter for the target agent:
   - `name` (use `consider`, lowercase with hyphens),
   - `description` (when and why the skill should be used).
-- What the feedback system is and why it exists.
-- The full CLI command reference with examples.
+- Trigger cues (e.g., `threadID: <id>`, explicit request to check Consider comments, or `consider-cli` references).
+- A no-work branch (if there are no open comments, acknowledge and continue the main task).
+- CLI failure handling guidance (store busy/conflict retry, comment-not-found recovery, orphaned context escalation).
 - Conventions: when to reply in a thread vs. elevate to the main conversation, how to handle stale comments, when to resolve threads.
 - A note that the feedback store is at `.consider/store.json` and can be read directly if needed, but the CLI is preferred.
 

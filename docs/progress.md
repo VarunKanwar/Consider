@@ -712,3 +712,37 @@
 ### What's known to be incomplete
 
 1. **No dedicated parse command for free-form chat logs** — agents still parse `threadID:` tokens from normal conversation context.
+
+---
+
+## Post-Phase: Skill Template Hardening
+
+**Status:** Complete
+
+### What was built
+
+1. **Richer skill trigger metadata** (`extension/src/setup.ts`)
+   - Expanded generated skill descriptions to include explicit trigger cues (`threadID`, `consider-cli`, Consider comment triage).
+
+2. **Workflow/failure guidance upgrades in generated skills** (`extension/src/setup.ts`)
+   - Added explicit no-work branch when there are no open comments.
+   - Added CLI failure handling guidance for store conflict/busy, missing thread IDs/comments, and orphaned context.
+   - Reduced command duplication by replacing the full command catalog with a shorter quick-reference list.
+
+3. **Codex UI metadata generation** (`extension/src/setup.ts`)
+   - Setup now writes `agents/openai.yaml` alongside Codex `SKILL.md` with `display_name`, `short_description`, and `default_prompt`.
+
+4. **Setup test coverage updates** (`test/extension/setup.test.ts`)
+   - Added assertions for generated Codex `agents/openai.yaml` existence and required metadata fields.
+
+### What was tested
+
+1. `npm test` (passes).
+
+### Implementation decisions not in the spec
+
+1. **Codex metadata scope:** `agents/openai.yaml` generation is currently added only for Codex skill installs.
+
+### What's known to be incomplete
+
+1. **No optional icon/brand metadata yet:** `agents/openai.yaml` currently includes interface text fields only.
