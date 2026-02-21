@@ -7,6 +7,7 @@
  * Commands:
  *   list [--workflow <state>] [--anchor <state>] [--status <legacy>] [--unseen] [--file <path>] [--json]
  *   get <comment-id> [--json]
+ *   thread <comment-id> [--json]
  *   reply <comment-id> --message "..."
  *   resolve <comment-id>
  *   unresolve <comment-id>
@@ -223,8 +224,8 @@ function cmdList(projectRoot, flags) {
   }
 }
 
-function cmdGet(projectRoot, commentId, flags) {
-  if (!commentId) die('Usage: consider-cli get <comment-id>');
+function cmdGet(projectRoot, commentId, flags, usageCommand = 'get') {
+  if (!commentId) die(`Usage: consider-cli ${usageCommand} <comment-id>`);
 
   const data = loadStoreForRead(projectRoot);
   const comment = store.findComment(data, commentId);
@@ -250,6 +251,10 @@ function cmdGet(projectRoot, commentId, flags) {
       process.stdout.write(`${reply.body}\n`);
     }
   }
+}
+
+function cmdThread(projectRoot, commentId, flags) {
+  cmdGet(projectRoot, commentId, flags, 'thread');
 }
 
 function cmdReply(projectRoot, commentId, flags) {
@@ -482,6 +487,9 @@ Commands:
   get <comment-id> [--json]
       Get a comment with its full thread.
 
+  thread <comment-id> [--json]
+      Alias for "get" (optimized for thread-focused workflows).
+
   reply <comment-id> --message "..."
       Reply to a comment thread (as agent).
 
@@ -518,6 +526,9 @@ function main() {
         break;
       case 'get':
         cmdGet(projectRoot, positional[0], flags);
+        break;
+      case 'thread':
+        cmdThread(projectRoot, positional[0], flags);
         break;
       case 'reply':
         cmdReply(projectRoot, positional[0], flags);

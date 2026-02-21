@@ -35,6 +35,7 @@ TODO: GIF showing the flow of comment creation in the editor -> skill invocation
 - `Add Comment`
 - `Reply`
 - `Resolve` / `Unresolve`
+- `Copy Thread ID`
 - `Consider: Setup`
 - `Consider: Uninstall`
 - `Consider: Show All Comments`
@@ -46,6 +47,7 @@ TODO: GIF showing the flow of comment creation in the editor -> skill invocation
 ```sh
 .consider/bin/consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]
 .consider/bin/consider-cli get <comment-id> [--json]
+.consider/bin/consider-cli thread <comment-id> [--json]
 .consider/bin/consider-cli context <comment-id> [--lines N] [--json]
 .consider/bin/consider-cli reply <comment-id> --message "..."
 .consider/bin/consider-cli resolve <comment-id>

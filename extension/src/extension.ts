@@ -378,6 +378,15 @@ class ConsiderController {
       )
     );
 
+    this.disposables.push(
+      vscode.commands.registerCommand(
+        'consider.copyThreadId',
+        (thread: vscode.CommentThread) => {
+          void this.handleCopyThreadId(thread);
+        }
+      )
+    );
+
     // Delete comment
     this.disposables.push(
       vscode.commands.registerCommand(
@@ -664,6 +673,20 @@ class ConsiderController {
     this.writeStoreSuppress(store);
 
     this.applyThreadPresentation(thread, comment);
+  }
+
+  private async handleCopyThreadId(thread: vscode.CommentThread): Promise<void> {
+    const commentId = this.getCommentIdFromThread(thread);
+    if (!commentId) {
+      vscode.window.showWarningMessage(
+        'Could not determine the thread ID for this comment.'
+      );
+      return;
+    }
+
+    const clipboardValue = `threadID: ${commentId}`;
+    await vscode.env.clipboard.writeText(clipboardValue);
+    vscode.window.showInformationMessage(`Copied ${clipboardValue}`);
   }
 
   private handleDeleteComment(comment: FeedbackReply): void {

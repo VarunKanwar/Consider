@@ -192,7 +192,7 @@ The dominant edit pattern is: the agent modifies files via the terminal (Claude 
 
 Therefore, **both** the CLI and the extension perform reconciliation, each covering a different scenario:
 
-**The CLI** performs **lazy reconciliation on every read operation**. When the agent (or anyone) calls `consider-cli list`, `consider-cli get`, or `consider-cli context`, the CLI:
+**The CLI** performs **lazy reconciliation on every read operation**. When the agent (or anyone) calls `consider-cli list`, `consider-cli get`, `consider-cli thread`, or `consider-cli context`, the CLI:
 
 1. Reads the store.
 2. For each comment whose target file has a modification time newer than the comment's `lastAnchorCheck` timestamp, runs the re-anchoring algorithm.
@@ -326,6 +326,10 @@ consider-cli get <comment-id>
     Output: the comment body, all replies, file path, line info, and
     a snippet of the surrounding code for context.
 
+consider-cli thread <comment-id>
+    Alias for `get`, intended for thread-focused workflows (for example,
+    when the developer shares a copied `threadID: ...` token).
+
 consider-cli reply <comment-id> --message "..."
     Add a reply to a comment thread. Sets author to "agent".
 
@@ -346,7 +350,7 @@ consider-cli context <comment-id>
     This gives the agent the code context alongside the feedback.
 ```
 
-Every read command (`list`, `get`, `context`, `summary`) performs lazy reconciliation before returning results (see Section 4.3). This ensures the agent always sees accurate, up-to-date anchor positions regardless of when or how the files were modified.
+Every read command (`list`, `get`, `thread`, `context`, `summary`) performs lazy reconciliation before returning results (see Section 4.3). This ensures the agent always sees accurate, up-to-date anchor positions regardless of when or how the files were modified.
 
 ### 6.3 Output Format
 

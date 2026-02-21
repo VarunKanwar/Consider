@@ -450,11 +450,13 @@ Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedb
 2. If open comments exist, inspect them:
    - \`.consider/bin/consider-cli list\`
    - \`.consider/bin/consider-cli context <comment-id>\`
-3. Reply directly in the thread:
+3. If the developer shares \`threadID: <comment-id>\`, fetch that exact thread:
+   - \`.consider/bin/consider-cli thread <comment-id>\`
+4. Reply directly in the thread:
    - \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
-4. Resolve only after the requested action is complete (or the developer confirms no change is needed):
+5. Resolve only after the requested action is complete (or the developer confirms no change is needed):
    - \`.consider/bin/consider-cli resolve <comment-id>\`
-5. Reopen if follow-up work remains:
+6. Reopen if follow-up work remains:
    - \`.consider/bin/consider-cli unresolve <comment-id>\`
 
 ## Conventions
@@ -475,6 +477,7 @@ Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedb
 
 - \`.consider/bin/consider-cli list [--workflow open|resolved|all] [--anchor anchored|stale|orphaned|all] [--unseen] [--file <path>] [--json]\`
 - \`.consider/bin/consider-cli get <comment-id> [--json]\`
+- \`.consider/bin/consider-cli thread <comment-id> [--json]\`
 - \`.consider/bin/consider-cli context <comment-id> [--lines N] [--json]\`
 - \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
 - \`.consider/bin/consider-cli resolve <comment-id>\`

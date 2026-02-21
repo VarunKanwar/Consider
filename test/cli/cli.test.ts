@@ -266,6 +266,28 @@ describe('cli', () => {
     });
   });
 
+  // --- thread ---
+  describe('thread', () => {
+    it('fetches a single thread using thread command', () => {
+      const out = run(['thread', 'c_aaa11111'], tmpDir);
+      assert.ok(out.includes('Comment c_aaa11111'));
+      assert.ok(out.includes('This variable name is too short.'));
+      assert.ok(out.includes('I will rename it to something descriptive.'));
+    });
+
+    it('outputs JSON with --json', () => {
+      const out = run(['thread', 'c_aaa11111', '--json'], tmpDir);
+      const data = JSON.parse(out);
+      assert.equal(data.id, 'c_aaa11111');
+      assert.equal(data.thread.length, 1);
+    });
+
+    it('fails when no comment-id provided', () => {
+      const err = runFail(['thread'], tmpDir);
+      assert.ok(err.includes('Usage: consider-cli thread <comment-id>'));
+    });
+  });
+
   // --- reply ---
   describe('reply', () => {
     it('adds a reply to a comment', () => {

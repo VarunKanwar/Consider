@@ -273,6 +273,20 @@ suite('Consider Extension Host', () => {
     assert.equal(thread.state, vscode.CommentThreadState.Unresolved);
   });
 
+  test('copy thread ID command writes threadID token to clipboard', async () => {
+    const root = workspaceRoot();
+    await vscode.commands.executeCommand('consider.setupAgentIntegration');
+    const { thread, commentId } = await addCommentViaPayload(
+      root,
+      'Clipboard copy thread id test comment',
+      controllers
+    );
+
+    await vscode.commands.executeCommand('consider.copyThreadId', thread);
+    const clipboardValue = await vscode.env.clipboard.readText();
+    assert.equal(clipboardValue, `threadID: ${commentId}`);
+  });
+
   test('tree comment selection opens and expands only the selected thread', async () => {
     const root = workspaceRoot();
     await vscode.commands.executeCommand('consider.setupAgentIntegration');

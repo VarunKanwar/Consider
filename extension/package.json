@@ -49,6 +49,11 @@
         "icon": "$(refresh)"
       },
       {
+        "command": "consider.copyThreadId",
+        "title": "Copy Thread ID",
+        "icon": "$(copy)"
+      },
+      {
         "command": "consider.deleteComment",
         "title": "Delete",
         "icon": "$(trash)"
@@ -98,6 +103,11 @@
           "command": "consider.unresolveThread",
           "group": "navigation",
           "when": "commentController == consider && commentThread =~ /^consider-thread-resolved-/"
+        },
+        {
+          "command": "consider.copyThreadId",
+          "group": "navigation@2",
+          "when": "commentController == consider && !commentThreadIsEmpty"
         }
       ],
       "comments/commentThread/context": [

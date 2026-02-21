@@ -672,3 +672,43 @@
 ### What's known to be incomplete
 
 1. **Legacy artifact shims are not shipped:** old `feedback-cli` wrappers are intentionally removed in favor of clean naming; legacy compatibility is provided at store-path level and setup migration flow.
+
+---
+
+## Post-Phase: Thread ID Copy + Thread Fetch Flow
+
+**Status:** Complete
+
+### What was built
+
+1. **Thread-header copy action in extension UI** (`extension/package.json`, `extension/src/extension.ts`)
+   - Added `Copy Thread ID` command to comment thread title actions next to resolve/unresolve.
+   - New command copies `threadID: <comment-id>` into clipboard for direct sharing in agent chat.
+
+2. **CLI thread fetch command** (`cli/consider-cli.js`)
+   - Added `thread <comment-id> [--json]` command as a thread-first alias for `get`.
+   - Updated CLI help text and command router.
+
+3. **Skill loop update** (`extension/src/setup.ts`)
+   - Skill template now explicitly handles copied thread tokens:
+     - if developer shares `threadID: <comment-id>`, run `consider-cli thread <comment-id>`.
+   - Added `thread` to the generated command list.
+
+4. **Tests and docs updates**
+   - Added CLI tests for `thread` command behavior (`test/cli/cli.test.ts`).
+   - Added extension host integration test for clipboard behavior (`extension/test/suite/extension.integration.test.js`).
+   - Updated command documentation in `README.md` and `docs/spec.md`.
+
+### What was tested
+
+1. `npm test` (passes).
+2. `npm run test:extension:host` (passes).
+
+### Implementation decisions not in the spec
+
+1. **`thread` command is intentionally an alias** of `get` for backward compatibility and easier adoption.
+2. **Clipboard token format is fixed** as `threadID: <id>` to keep parsing and human handoff consistent.
+
+### What's known to be incomplete
+
+1. **No dedicated parse command for free-form chat logs** — agents still parse `threadID:` tokens from normal conversation context.
