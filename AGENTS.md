@@ -10,16 +10,7 @@ The spec has 5 hard constraints (Section 2). Memorize them. The most commonly vi
 
 ## Build phases
 
-This project is built in phases. **Complete one phase fully before starting the next.** Do not skip ahead, do not partially implement a later phase, and do not combine phases unless explicitly told to. Each phase should produce a working, testable increment.
-
-- **Phase 1: Store format + CLI skeleton** — JSON schema, CLI with `list`, `get`, `reply`, `resolve`, `summary`, `context`. Static line numbers, no reconciliation yet. Testable by hand-editing `store.json`.
-- **Phase 2: Extension skeleton** — VS Code Comments API wired up. Add/view/reply/resolve comments. Persist to store. File watcher for agent replies.
-- **Phase 3: Content-based anchoring** — Re-anchoring algorithm in both CLI and extension. Mtime-based change detection. Staleness and orphan detection. This is the riskiest piece — test thoroughly.
-- **Phase 4: Agent integration setup** — "Setup" command. Skill files for Claude Code, OpenCode, Codex. Full loop test.
-- **Phase 5: Polish** — Tree view panel, archive resolved, visual refinements, Reconcile All command.
-- **Phase 6: Testing hardening** — Add VS Code Extension Host integration tests (`@vscode/test-electron` / `@vscode/test-cli`) for command-level end-to-end flows. Keep `npm test` fast and deterministic while adding release-grade coverage for the advertised workflow.
-- **Phase 7: Onboarding and installation UX** — Add a guided setup flow (extension-first), keep `.consider/` fixed at project root, make agent skill installation explicit opt-in (not implicit side effect), and let users choose workspace vs home skill install scope.
-- **Phase 8: Offboarding and uninstall UX** — Add a guided uninstall flow and track setup artifact locations so skill/runtime cleanup is deterministic and safe.
+This project is built in phases, as laid out in docs/spec.md. If you are being asked to implement a phase, it must be anchored in the spec -- create a phase and flesh it out before you execute, making sure to match the level of detail in the spec. **Complete one phase fully before starting the next.** Do not skip ahead, do not partially implement a later phase, and do not combine phases unless explicitly told to. Each phase should produce a working, testable increment.
 
 When you finish a phase, update `docs/progress.md` with: what was built, what was tested, what implementation decisions were made that aren't in the spec, and what's known to be incomplete.
 
@@ -41,14 +32,11 @@ If you think something should be added that isn't in the spec, ask before buildi
 
 ## Repository structure
 
-After scaffolding, the repo should look roughly like:
-
-```
 consider/
 ├── docs/
 │   ├── spec.md                 # Technical specification (read-only reference)
 │   ├── progress.md             # Phase completion log (you update this)
-│   └── manual-testing.md       # Manual test procedures (you generate this)
+│   └── manual-testing.md       # Manual test procedures and checklists
 ├── extension/                  # VS Code extension (TypeScript)
 │   ├── src/
 │   ├── package.json            # Extension manifest
@@ -56,7 +44,7 @@ consider/
 ├── cli/                        # CLI tool source (Node.js, zero dependencies)
 │   ├── consider-cli.js         # Main implementation
 │   └── consider-cli            # Shell wrapper
-├── shared/                     # Shared logic (if extracted — see spec Section 9.5)
+├── shared/                     # Any shared logic
 ├── test/                       # Test fixtures and test scripts
 │   ├── cli/
 │   └── extension/
@@ -64,9 +52,8 @@ consider/
 ├── CLAUDE.md                   # → symlink to AGENTS.md
 ├── .gitignore
 └── README.md
-```
 
-This is a starting point. Adjust as needed during implementation, but explain structural changes in your commit messages and in `docs/progress.md`.
+This is a rough snapshot of the repository at the time of writing. Adjust as needed during implementation, but large structural changes require approval and explanation in `docs/spec.md` and `docs/progress.md`.
 
 ## Technology decisions
 
@@ -115,35 +102,18 @@ Set up these npm scripts during Phase 1/2 scaffolding. Adjust as needed but keep
 
 ### Linting and formatting
 
-Use ESLint and Prettier with standard TypeScript configs. Run `npm run lint` and `npm run format`. Configure these during scaffolding. Do not deviate from standard community configs unless there's a specific reason.
+Use ESLint and Prettier with standard TypeScript configs. Run `npm run lint` and `npm run format`. Do not deviate from standard community configs unless there's a specific reason.
 
 ## Testing expectations
 
 Use `docs/testing-strategy.md` as the repository-wide testing source of truth for merge/release gates and integration-test roadmap decisions.
 Use `docs/known-limitations.md` as the single source of truth for confirmed product limitations; other docs should link to it rather than restating limitation details.
 
-Every phase must include tests. What "tests" means varies by phase:
-
-**Phase 1 (CLI):** Automated tests. Create test fixtures (sample `store.json` files), run CLI commands, verify output. Test each command with normal input, edge cases (empty store, nonexistent ID, missing file), and the `--json` flag. A simple test runner using Node's built-in `node:test` and `node:assert` is fine — no test framework dependencies in the CLI.
-
-**Phase 2 (Extension):** Manual testing instructions in `docs/manual-testing.md`. Step-by-step: open VS Code with the extension in dev mode, open a test project, add a comment, verify it appears in `store.json`, simulate an agent reply by editing the store externally, verify the reply renders. Also write unit tests for any pure logic (store read/write, ID generation).
-
-**Phase 3 (Anchoring):** Automated tests with specific edit scenarios. Spec Section 4.3 lists the patterns to test: insertion above a comment, deletion of lines around a comment, function rename, file deletion. Create fixture files, apply known edits, verify re-anchored positions and staleness detection. These tests must cover both the CLI and extension implementations and verify they produce the same results.
-
-**Phase 4 (Agent setup):** Verify the setup command creates correct directory structure, generates valid skill files, appends to `.gitignore` without duplicates. Test with and without existing `.claude/`, `.opencode/`, and `.codex/` directories (plus legacy `.agents/` detection compatibility).
-
-**Phase 5 (Polish):** Manual testing for UI features (tree view, archive). Automated tests for any new logic.
-
-**Phase 6 (Testing hardening):** Add Extension Host integration tests for setup command, add-comment command path, watcher-driven reply rendering, and reconciliation scenarios in fixture workspaces. Define CI split between PR-gating tests and slower release/nightly smoke tests.
-
-**Phase 7 (Onboarding and installation UX):** Add automated tests for setup-flow decision logic plus manual tests for first-run UX. Verify explicit consent behavior (no skill writes unless selected), idempotent reruns, and clear setup summaries.
-
-**Phase 8 (Offboarding and uninstall UX):** Add automated tests for uninstall path decisions and cleanup behavior (tracked skill removal, fallback detection for older installs, data-retain vs full-remove modes), plus manual tests for command UX and safety confirmations.
+Every phase must include tests. What "tests" means varies by phase. For example, Phase 1 focuses on automated tests for the CLI, while Phase 2 includes manual testing instructions for the extension. Phase 3 requires automated tests for the anchoring algorithm across both components. Each phase's testing strategy should be clearly defined in `docs/progress.md` when the phase is completed.
 
 ## Commit conventions
 
-- Small, focused commits. One logical change per commit.
-- Format: `phase N: short description` (e.g., `phase 1: implement CLI list command with status filtering`)
+- Small, focused commits in conventional commit format. One logical change per commit.
 - If a commit touches multiple phases (should be rare), explain why in the commit body.
 - Never commit broken tests. If a test is failing, fix it in the same commit or explain in the message why it's expected.
 - Commit `docs/progress.md` updates at the end of each phase.
@@ -175,4 +145,4 @@ Resolved comments can still become stale/orphaned if code moves or files disappe
 
 - **Architectural questions:** Check `docs/spec.md` first. If the answer isn't there, ask before implementing.
 - **Implementation details** the spec doesn't cover (e.g., debounce timing for extension re-anchoring, exact similarity threshold for staleness): make a reasonable choice, document it in a code comment and in `docs/progress.md`, and move on. These can be tuned later.
-- **Scope creep:** If you find yourself building something that would take more than ~30 minutes and isn't described in the current phase, stop and ask.
+- **Scope creep:** If you find yourself building something that would count as a large refactor or change, and isn't described in the current phase, stop and ask.
