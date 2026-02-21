@@ -267,6 +267,11 @@ describe('setup agent integration', () => {
         'Do not edit code unless there is a clear, explicit instruction to change code (in the thread or main chat).'
       )
     );
+    assert.ok(
+      codexSkill.includes(
+        'Default to NOT resolving threads unless closure is explicit and complete.'
+      )
+    );
   });
 
   it('tracks installed skill locations in .consider/config.json', () => {

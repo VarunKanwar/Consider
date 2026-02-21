@@ -460,7 +460,9 @@ Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedb
    - \`.consider/bin/consider-cli thread <comment-id>\`
 5. Reply directly in the thread:
    - \`.consider/bin/consider-cli reply <comment-id> --message "..." \`
-6. Resolve only after the requested action is complete (or the developer confirms no change is needed):
+6. Default to leaving threads open. Resolve only when both are true:
+   - the issue is fully addressed,
+   - the discussion is clearly at an end.
    - \`.consider/bin/consider-cli resolve <comment-id>\`
 7. Reopen if follow-up work remains:
    - \`.consider/bin/consider-cli unresolve <comment-id>\`
@@ -468,6 +470,7 @@ Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedb
 ## Conventions
 
 - Default to conversational handling first: read feedback, reply, and clarify before editing code.
+- Default to NOT resolving threads unless closure is explicit and complete.
 - Treat \`workflow=open\` comments as review items to triage, not automatic edit instructions.
 - Treat \`anchor=stale\` comments as potentially outdated: flag in main chat before acting.
 - Treat \`anchor=orphaned\` comments as file-move/delete follow-up.
@@ -483,7 +486,7 @@ Use the CLI in \`.consider/bin/consider-cli\` to read and reply to located feedb
 
 - If CLI reports store busy/conflict, retry once before escalating.
 - If CLI reports comment not found, rerun \`list\` and ask for a refreshed \`threadID\` if needed.
-- If \`context\` reports orphaned/missing file, flag it in main chat and ask whether to resolve, reopen, or remap.
+- If \`context\` reports orphaned/missing file, flag it in main chat and ask whether to keep open, resolve, or remap.
 
 ## Quick Reference
 
@@ -501,7 +504,7 @@ function buildCodexOpenAiMetadata(): string {
     'interface:',
     '  display_name: "Consider"',
     '  short_description: "Review and reply to inline Consider threads"',
-    '  default_prompt: "Use $consider to review open Consider comments, reply in thread, and resolve completed feedback."',
+    '  default_prompt: "Use $consider to review open Consider comments, reply in thread, and only resolve when the issue is fully addressed and discussion is complete."',
     '',
   ].join('\n');
 }

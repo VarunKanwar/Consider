@@ -453,7 +453,7 @@ The "Setup" command can write skill files into the project when the developer ex
 - Trigger cues (e.g., `threadID: <id>`, explicit request to check Consider comments, or `consider-cli` references).
 - A no-work branch (if there are no open comments, acknowledge and continue the main task).
 - CLI failure handling guidance (store busy/conflict retry, comment-not-found recovery, orphaned context escalation).
-- Conventions: when to reply in a thread vs. elevate to the main conversation, how to handle stale comments, when to resolve threads.
+- Conventions: when to reply in a thread vs. elevate to the main conversation, how to handle stale comments, and to default to keeping threads open until the issue is fully addressed and discussion is clearly complete.
 - A note that the feedback store is at `.consider/store.json` and can be read directly if needed, but the CLI is preferred.
 
 ### 8.2 Setup Command Behavior

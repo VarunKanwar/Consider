@@ -726,6 +726,7 @@
 
 2. **Workflow/failure guidance upgrades in generated skills** (`extension/src/setup.ts`)
    - Added explicit no-work branch when there are no open comments.
+   - Added explicit default behavior to keep threads open unless the issue is fully addressed and the discussion is clearly complete.
    - Added CLI failure handling guidance for store conflict/busy, missing thread IDs/comments, and orphaned context.
    - Reduced command duplication by replacing the full command catalog with a shorter quick-reference list.
 
