@@ -747,3 +747,41 @@
 ### What's known to be incomplete
 
 1. **No optional icon/brand metadata yet:** `agents/openai.yaml` currently includes interface text fields only.
+
+---
+
+## Post-Phase: Storage Write-Path Unification
+
+**Status:** Complete
+
+### What was built
+
+1. **Extension store adapter now delegates to shared runtime store logic** (`extension/src/store.ts`)
+   - Replaced extension-local read/write normalization implementation with typed wrappers over `extension/runtime/shared/store.js`.
+   - Extension now uses the same lock, revision conflict detection, mutation-on-latest, and atomic-write semantics as the CLI/shared runtime.
+   - Added typed export for `mutateStore(...)` in extension runtime code.
+
+2. **Extension write call sites migrated to mutation-on-latest writes** (`extension/src/extension.ts`)
+   - Reworked root comment creation, replies, resolve/unresolve, delete flows, archive-resolved persistence, reconcile persistence, and active-editor anchor sync to mutate under shared store lock.
+   - Replaced `writeStoreSuppress` with `mutateStoreSuppress` so extension write operations no longer perform stale snapshot read-modify-write persistence.
+   - Added explicit lock-timeout user messaging (`Consider store is busy...`) on write contention.
+
+3. **Extension storage concurrency test coverage added** (`test/extension/store.test.ts`)
+   - Added stale snapshot conflict test proving extension wrapper surfaces `ESTORECONFLICT`.
+   - Added concurrent extension-vs-CLI write test proving both updates persist (no dropped update on concurrent mutations).
+
+### What was tested
+
+1. `npm test` (passes).
+2. `npm run test:extension:host` (passes).
+3. `npm run test:full` (passes, including UI smoke).
+
+### Implementation decisions not in the spec
+
+1. **Single mutation helper in extension controller:** all extension write operations now funnel through one helper (`mutateStoreSuppress`) for consistent lock/error/suppression behavior.
+2. **Shared runtime is source-of-truth for persistence semantics:** extension-side type-safe wrappers call shared runtime functions directly instead of maintaining duplicate persistence logic in TypeScript.
+3. **Conflict handling kept defensive in extension helper:** `ESTORECONFLICT` handling remains in the helper for resilience even though mutation-on-latest should avoid stale-snapshot conflicts for normal extension write paths.
+
+### What's known to be incomplete
+
+1. **Archive flow is not cross-file transactional:** archive writes (`archive.json`) and active-store updates (`store.json`) are still separate atomic writes, not a single transaction across both files.

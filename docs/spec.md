@@ -527,6 +527,8 @@ Both the extension and the CLI can write to `store.json` simultaneously (e.g., t
 - Mutation-on-latest writes for command operations (`reply`, `resolve`, `unresolve`) so updates apply to the most recent on-disk state.
 - Atomic writes using a unique temp filename per write followed by rename.
 
+Implemented direction: the extension and CLI now both delegate persistence semantics to the same shared runtime store module for lock acquisition, mutation-on-latest behavior, and write conflict handling.
+
 If a write cannot acquire the lock in time, the CLI should return a clear retryable error (not a raw stack trace).
 
 ### 9.4 Large Projects and Performance

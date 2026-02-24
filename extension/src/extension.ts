@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
+  mutateStore,
   readStore,
   storePath,
-  writeStore,
   generateCommentId,
   generateReplyId,
   findComment,
@@ -566,8 +566,6 @@ class ConsiderController {
     const commentId = generateCommentId();
     const now = new Date().toISOString();
 
-    // Save to store
-    const store = readStore(this.projectRoot);
     const feedbackComment: FeedbackComment = {
       id: commentId,
       file: relativePath.replace(/\\/g, '/'), // normalize to forward slashes
@@ -587,8 +585,14 @@ class ConsiderController {
       body: normalizedBody,
       thread: [],
     };
-    store.comments.push(feedbackComment);
-    this.writeStoreSuppress(store);
+    const update = this.mutateStoreSuppress((store) => {
+      store.comments.push(feedbackComment);
+      return true;
+    });
+    if (!update || update.result === false) {
+      thread.dispose();
+      return;
+    }
 
     // Create the visual comment
     const newComment = new FeedbackReply(
@@ -612,30 +616,42 @@ class ConsiderController {
       return;
     }
 
-    const store = readStore(this.projectRoot);
-    const comment = findComment(store, commentId);
-    if (!comment) {
-      vscode.window.showErrorMessage(`Comment ${commentId} not found in store.`);
-      return;
-    }
-    if (comment.workflowState === 'resolved') {
-      vscode.window.showInformationMessage(
-        'This thread is resolved. Use Unresolve before replying.'
-      );
-      return;
-    }
-
-    const replyId = generateReplyId();
+    let missingComment = false;
+    let resolvedComment = false;
+    let replyId: string | undefined;
     const now = new Date().toISOString();
 
-    const storeReply: Reply = {
-      id: replyId,
-      author: 'human',
-      body: reply.text,
-      createdAt: now,
-    };
-    comment.thread.push(storeReply);
-    this.writeStoreSuppress(store);
+    const update = this.mutateStoreSuppress((store) => {
+      const comment = findComment(store, commentId);
+      if (!comment) {
+        missingComment = true;
+        return false;
+      }
+      if (comment.workflowState === 'resolved') {
+        resolvedComment = true;
+        return false;
+      }
+
+      const storeReply: Reply = {
+        id: generateReplyId(),
+        author: 'human',
+        body: reply.text,
+        createdAt: now,
+      };
+      comment.thread.push(storeReply);
+      replyId = storeReply.id;
+      return true;
+    });
+    if (!update || update.result === false || !replyId) {
+      if (missingComment) {
+        vscode.window.showErrorMessage(`Comment ${commentId} not found in store.`);
+      } else if (resolvedComment) {
+        vscode.window.showInformationMessage(
+          'This thread is resolved. Use Unresolve before replying.'
+        );
+      }
+      return;
+    }
 
     // Add to visual thread
     const newReply = new FeedbackReply(
@@ -651,28 +667,42 @@ class ConsiderController {
     const commentId = this.getCommentIdFromThread(thread);
     if (!commentId) return;
 
-    const store = readStore(this.projectRoot);
-    const comment = findComment(store, commentId);
-    if (!comment) return;
+    let updatedComment: FeedbackComment | undefined;
+    const update = this.mutateStoreSuppress((store) => {
+      const comment = findComment(store, commentId);
+      if (!comment) {
+        return false;
+      }
+      comment.workflowState = 'resolved';
+      updatedComment = comment;
+      return true;
+    });
+    if (!update || update.result === false || !updatedComment) {
+      return;
+    }
 
-    comment.workflowState = 'resolved';
-    this.writeStoreSuppress(store);
-
-    this.applyThreadPresentation(thread, comment);
+    this.applyThreadPresentation(thread, updatedComment);
   }
 
   private handleUnresolve(thread: vscode.CommentThread): void {
     const commentId = this.getCommentIdFromThread(thread);
     if (!commentId) return;
 
-    const store = readStore(this.projectRoot);
-    const comment = findComment(store, commentId);
-    if (!comment) return;
+    let updatedComment: FeedbackComment | undefined;
+    const update = this.mutateStoreSuppress((store) => {
+      const comment = findComment(store, commentId);
+      if (!comment) {
+        return false;
+      }
+      comment.workflowState = 'open';
+      updatedComment = comment;
+      return true;
+    });
+    if (!update || update.result === false || !updatedComment) {
+      return;
+    }
 
-    comment.workflowState = 'open';
-    this.writeStoreSuppress(store);
-
-    this.applyThreadPresentation(thread, comment);
+    this.applyThreadPresentation(thread, updatedComment);
   }
 
   private async handleCopyThreadId(thread: vscode.CommentThread): Promise<void> {
@@ -696,20 +726,31 @@ class ConsiderController {
       if (comments.some((c) => c.storeId === comment.storeId)) {
         // If it's the root comment (first in thread), remove the whole thread
         if (comments[0]?.storeId === comment.storeId) {
-          const store = readStore(this.projectRoot);
-          store.comments = store.comments.filter((c) => c.id !== commentId);
-          this.writeStoreSuppress(store);
+          const update = this.mutateStoreSuppress((store) => {
+            const beforeCount = store.comments.length;
+            store.comments = store.comments.filter((entry) => entry.id !== commentId);
+            return store.comments.length !== beforeCount;
+          });
+          if (!update || update.result === false) {
+            return;
+          }
           thread.dispose();
           this.threadMap.delete(commentId);
         } else {
           // It's a reply — remove just the reply
-          const store = readStore(this.projectRoot);
-          const storeComment = findComment(store, commentId);
-          if (storeComment) {
+          const update = this.mutateStoreSuppress((store) => {
+            const storeComment = findComment(store, commentId);
+            if (!storeComment) {
+              return false;
+            }
+            const beforeCount = storeComment.thread.length;
             storeComment.thread = storeComment.thread.filter(
-              (r) => r.id !== comment.storeId
+              (replyEntry) => replyEntry.id !== comment.storeId
             );
-            this.writeStoreSuppress(store);
+            return storeComment.thread.length !== beforeCount;
+          });
+          if (!update || update.result === false) {
+            return;
           }
           thread.comments = comments.filter(
             (c) => c.storeId !== comment.storeId
@@ -1327,21 +1368,28 @@ class ConsiderController {
   }
 
   private handleArchiveResolved(): void {
-    const store = readStore(this.projectRoot);
-    const result = archiveResolvedComments(this.projectRoot, store);
-    if (result.archivedCount === 0) {
+    let archiveResult:
+      | ReturnType<typeof archiveResolvedComments>
+      | undefined;
+    const update = this.mutateStoreSuppress((store) => {
+      archiveResult = archiveResolvedComments(this.projectRoot, store);
+      return archiveResult.archivedCount > 0;
+    });
+
+    if (!archiveResult || archiveResult.archivedCount === 0) {
       vscode.window.showInformationMessage(
         'Consider: No resolved comments to archive.'
       );
       return;
     }
 
-    this.writeStoreSuppress(store);
-    this.reloadFromStore();
+    if (update && update.result !== false) {
+      this.reloadFromStore();
+    }
 
     vscode.window.showInformationMessage(
-      `Consider: Archived ${result.archivedCount} resolved comment${
-        result.archivedCount === 1 ? '' : 's'
+      `Consider: Archived ${archiveResult.archivedCount} resolved comment${
+        archiveResult.archivedCount === 1 ? '' : 's'
       } to .consider/archive.json.`
     );
   }
@@ -1400,12 +1448,25 @@ class ConsiderController {
   }
 
   private handleReconcileAll(): void {
-    const store = readStore(this.projectRoot);
-    const result = reconcileStoreForExtension(this.projectRoot, store, { force: true });
-    if (result.changed) {
-      this.writeStoreSuppress(store);
+    let reconcileResult:
+      | ReturnType<typeof reconcileStoreForExtension>
+      | undefined;
+    const update = this.mutateStoreSuppress((store) => {
+      reconcileResult = reconcileStoreForExtension(this.projectRoot, store, {
+        force: true,
+      });
+      return reconcileResult.changed;
+    });
+    if (update && update.result !== false) {
       this.reloadFromStore();
     }
+    const result = reconcileResult ?? {
+      changed: false,
+      checkedComments: 0,
+      updatedComments: 0,
+      stateChanges: 0,
+      statusChanges: 0,
+    };
     const summary = result.changed
       ? `updated ${result.updatedComments} comment${result.updatedComments === 1 ? '' : 's'}`
       : 'no anchor updates needed';
@@ -1466,19 +1527,17 @@ class ConsiderController {
   }
 
   private reconcileFile(relativePath: string, force: boolean): void {
-    let store: FeedbackStore;
-    try {
-      store = readStore(this.projectRoot);
-    } catch {
+    const updated = this.mutateStoreSuppress((store) => {
+      const result = reconcileStoreForExtension(this.projectRoot, store, {
+        force,
+        files: [relativePath],
+      });
+      return result.changed;
+    });
+    if (!updated || updated.result === false) {
       return;
     }
-    const result = reconcileStoreForExtension(this.projectRoot, store, {
-      force,
-      files: [relativePath],
-    });
-    if (!result.changed) return;
 
-    this.writeStoreSuppress(store);
     this.reloadFromStore();
   }
 
@@ -1488,68 +1547,74 @@ class ConsiderController {
   ): void {
     if (document.uri.scheme !== 'file') return;
 
-    let store: FeedbackStore;
-    try {
-      store = readStore(this.projectRoot);
-    } catch {
-      return;
-    }
     const lines = document.getText().split('\n');
     const now = new Date().toISOString();
-    let changed = false;
+    this.mutateStoreSuppress((store) => {
+      let changed = false;
 
-    for (const comment of store.comments) {
-      if (
-        comment.workflowState !== 'open' ||
-        comment.anchorState !== 'anchored' ||
-        comment.file !== relativePath
-      ) {
-        continue;
-      }
-      const thread = this.threadMap.get(comment.id);
-      if (!thread || !thread.range) continue;
+      for (const comment of store.comments) {
+        if (
+          comment.workflowState !== 'open' ||
+          comment.anchorState !== 'anchored' ||
+          comment.file !== relativePath
+        ) {
+          continue;
+        }
+        const thread = this.threadMap.get(comment.id);
+        if (!thread || !thread.range) continue;
 
-      const startLine = thread.range.start.line + 1;
-      const endLine = thread.range.end.line + 1;
+        const startLine = thread.range.start.line + 1;
+        const endLine = thread.range.end.line + 1;
 
-      const targetContent = lines.slice(startLine - 1, endLine).join('\n');
-      const contextBefore = lines.slice(Math.max(0, startLine - 3), Math.max(0, startLine - 1));
-      const contextAfter = lines.slice(endLine, Math.min(lines.length, endLine + 2));
-      const contentHash = hashAnchorContent(targetContent);
+        const targetContent = lines.slice(startLine - 1, endLine).join('\n');
+        const contextBefore = lines.slice(
+          Math.max(0, startLine - 3),
+          Math.max(0, startLine - 1)
+        );
+        const contextAfter = lines.slice(
+          endLine,
+          Math.min(lines.length, endLine + 2)
+        );
+        const contentHash = hashAnchorContent(targetContent);
 
-      if (comment.anchor.startLine !== startLine) {
-        comment.anchor.startLine = startLine;
-        changed = true;
+        if (comment.anchor.startLine !== startLine) {
+          comment.anchor.startLine = startLine;
+          changed = true;
+        }
+        if (comment.anchor.endLine !== endLine) {
+          comment.anchor.endLine = endLine;
+          changed = true;
+        }
+        if (
+          JSON.stringify(comment.anchor.contextBefore || []) !==
+          JSON.stringify(contextBefore)
+        ) {
+          comment.anchor.contextBefore = contextBefore;
+          changed = true;
+        }
+        if (
+          JSON.stringify(comment.anchor.contextAfter || []) !==
+          JSON.stringify(contextAfter)
+        ) {
+          comment.anchor.contextAfter = contextAfter;
+          changed = true;
+        }
+        if ((comment.anchor.targetContent || '') !== targetContent) {
+          comment.anchor.targetContent = targetContent;
+          changed = true;
+        }
+        if ((comment.anchor.contentHash || '') !== contentHash) {
+          comment.anchor.contentHash = contentHash;
+          changed = true;
+        }
+        if (comment.anchor.lastAnchorCheck !== now) {
+          comment.anchor.lastAnchorCheck = now;
+          changed = true;
+        }
       }
-      if (comment.anchor.endLine !== endLine) {
-        comment.anchor.endLine = endLine;
-        changed = true;
-      }
-      if (JSON.stringify(comment.anchor.contextBefore || []) !== JSON.stringify(contextBefore)) {
-        comment.anchor.contextBefore = contextBefore;
-        changed = true;
-      }
-      if (JSON.stringify(comment.anchor.contextAfter || []) !== JSON.stringify(contextAfter)) {
-        comment.anchor.contextAfter = contextAfter;
-        changed = true;
-      }
-      if ((comment.anchor.targetContent || '') !== targetContent) {
-        comment.anchor.targetContent = targetContent;
-        changed = true;
-      }
-      if ((comment.anchor.contentHash || '') !== contentHash) {
-        comment.anchor.contentHash = contentHash;
-        changed = true;
-      }
-      if (comment.anchor.lastAnchorCheck !== now) {
-        comment.anchor.lastAnchorCheck = now;
-        changed = true;
-      }
-    }
 
-    if (changed) {
-      this.writeStoreSuppress(store);
-    }
+      return changed;
+    });
   }
 
   private getRelativePathIfInProject(uri: vscode.Uri): string | null {
@@ -1880,14 +1945,30 @@ class ConsiderController {
   }
 
   /**
-   * Write to store with watcher suppression to avoid re-reading our own writes.
+   * Mutate the latest on-disk store while suppressing watcher feedback loops.
+   * Uses shared runtime lock + mutation semantics (same as CLI writes).
    */
-  private writeStoreSuppress(store: FeedbackStore): void {
+  private mutateStoreSuppress<TResult>(
+    mutator: (store: FeedbackStore) => TResult | false
+  ): { store: FeedbackStore; result: TResult | false } | undefined {
     this.suppressWatcher = true;
     try {
-      this.commentsTreeProvider.setStore(store);
-      writeStore(this.projectRoot, store);
+      const updated = mutateStore<TResult>(this.projectRoot, mutator);
+      if (updated.result !== false) {
+        this.commentsTreeProvider.setStore(updated.store);
+      }
+      return updated;
     } catch (err) {
+      if (
+        err &&
+        typeof err === 'object' &&
+        (err as { code?: string }).code === 'ESTORELOCKTIMEOUT'
+      ) {
+        vscode.window.showWarningMessage(
+          'Consider store is busy. Please retry your last action in a moment.'
+        );
+        return undefined;
+      }
       if (
         err &&
         typeof err === 'object' &&
@@ -1899,7 +1980,7 @@ class ConsiderController {
         vscode.window.showWarningMessage(
           'Consider store changed while saving. Please retry your last action.'
         );
-        return;
+        return undefined;
       }
       throw err;
     } finally {
