@@ -856,6 +856,11 @@ class ConsiderController {
       background: var(--vscode-editor-background);
       margin: 0;
       padding: 16px;
+      box-sizing: border-box;
+    }
+    .content {
+      max-inline-size: clamp(22rem, 82vw, 88ch);
+      margin: 0 auto;
     }
     h1 {
       font-size: 15px;
@@ -885,13 +890,24 @@ class ConsiderController {
     .row {
       display: grid;
       grid-template-columns: auto 1fr auto;
+      grid-template-areas:
+        "enabled title scope"
+        ". path path";
       gap: 10px;
-      align-items: center;
+      align-items: start;
       border: 1px solid var(--vscode-editorWidget-border);
       border-radius: 6px;
       padding: 10px;
       margin-bottom: 8px;
       background: var(--vscode-editorWidget-background);
+    }
+    .row-enabled {
+      grid-area: enabled;
+      margin-top: 2px;
+    }
+    .row-main {
+      grid-area: title;
+      min-width: 0;
     }
     .title {
       font-size: 13px;
@@ -899,11 +915,13 @@ class ConsiderController {
       margin-bottom: 4px;
     }
     .path {
+      grid-area: path;
       font-size: 11px;
       color: var(--vscode-descriptionForeground);
-      word-break: break-all;
+      word-break: break-word;
     }
     .scope-wrap {
+      grid-area: scope;
       display: inline-flex;
       align-items: center;
       gap: 8px;
@@ -911,6 +929,7 @@ class ConsiderController {
       color: var(--vscode-descriptionForeground);
       min-width: 170px;
       justify-content: flex-end;
+      margin-top: 1px;
     }
     .switch {
       position: relative;
@@ -973,23 +992,40 @@ class ConsiderController {
     button:hover {
       background: var(--vscode-button-hoverBackground);
     }
+    @media (max-width: 44rem) {
+      .content {
+        max-inline-size: none;
+      }
+      .row {
+        grid-template-columns: auto 1fr;
+        grid-template-areas:
+          "enabled title"
+          ". path"
+          ". scope";
+      }
+      .scope-wrap {
+        justify-content: flex-start;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>Consider Setup</h1>
-  <p>Configure workspace files and optional agent skills in one step.</p>
-  <div class="section-title">Project Settings</div>
-  <label class="setting">
-    <input type="checkbox" id="gitignore" checked />
-    <span>Add <code>.consider/</code> to <code>.gitignore</code></span>
-  </label>
-  <div class="section-title">Agent Skills</div>
-  <p>Select agents to install and set each scope with the switch (Workspace or Home).</p>
-  <div id="rows"></div>
-  <div class="actions">
-    <button class="secondary" id="cancel">Cancel</button>
-    <button id="submit">Continue</button>
-  </div>
+  <main class="content">
+    <h1>Consider Setup</h1>
+    <p>Configure workspace files and optional agent skills in one step.</p>
+    <div class="section-title">Project Settings</div>
+    <label class="setting">
+      <input type="checkbox" id="gitignore" checked />
+      <span>Add <code>.consider/</code> to <code>.gitignore</code></span>
+    </label>
+    <div class="section-title">Agent Skills</div>
+    <p>Select agents to install and set each scope with the switch (Workspace or Home).</p>
+    <div id="rows"></div>
+    <div class="actions">
+      <button class="secondary" id="cancel">Cancel</button>
+      <button id="submit">Continue</button>
+    </div>
+  </main>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
     const items = ${itemsJson};
@@ -1002,8 +1038,10 @@ class ConsiderController {
       const enabled = document.createElement('input');
       enabled.type = 'checkbox';
       enabled.id = \`enabled-\${item.target}\`;
+      enabled.className = 'row-enabled';
 
       const middle = document.createElement('div');
+      middle.className = 'row-main';
       const title = document.createElement('div');
       title.className = 'title';
       title.textContent = item.label;
